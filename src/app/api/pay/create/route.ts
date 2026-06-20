@@ -16,11 +16,18 @@ export async function POST(req: Request): Promise<Response> {
   const t = (await getTiers()).find((x) => x.id === tier)
   if (!t) return NextResponse.json({ error: '套餐不存在' }, { status: 400 })
 
+  // PUBLIC_BASE_URL 缺失防御：notify_url/return_url 必须是绝对地址，否则 zpay 回调会拼成相对路径
+  // 静默失效（付了款不到账）。这里在建单前就拒绝，避免留下永远收不到回调的 pending 单。
+  const base = (process.env.PUBLIC_BASE_URL || '').trim().replace(/\/+$/, '')
+  if (!/^https?:\/\//i.test(base)) {
+    console.error('[pay/create] PUBLIC_BASE_URL 未配置或非法，拒绝建单', { base: process.env.PUBLIC_BASE_URL })
+    return NextResponse.json({ error: '支付暂不可用：服务未正确配置回调地址，请联系客服' }, { status: 503 })
+  }
+
   const outTradeNo = genNo()
   await prisma.order.create({
     data: { outTradeNo, userId: u.id, tier: t.id, amountCents: t.priceCents, status: 'pending' }
   })
-  const base = process.env.PUBLIC_BASE_URL || ''
   try {
     const r = await createZpayOrder({
       outTradeNo,
@@ -48,6 +55,9 @@ export async function POST(req: Request): Promise<Response> {
     })
   } catch (e: any) {
     await prisma.order.update({ where: { outTradeNo }, data: { status: 'failed' } })
-    return NextResponse.json({ error: '下单失败：' + (e?.message ?? e) }, { status: 502 })
+    // zpay 的具体原因(如"ZPAY账户余额不足")进 pm2 日志，便于后台判断是余额不足还是真 bug。
+    const msg = String(e?.message ?? e)
+    console.error('[pay/create] zpay 下单失败', { outTradeNo, tier: t.id, amountCents: t.priceCents, reason: msg })
+    return NextResponse.json({ error: '下单失败：' + msg }, { status: 502 })
   }
 }

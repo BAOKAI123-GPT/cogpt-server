@@ -24,6 +24,14 @@ export function verifyZpayNotify(params: Record<string, string | undefined>): bo
   return zpaySign(params, key()) === given.toLowerCase()
 }
 
+// 金额比对：把易支付返回的元金额(可能是 "9.9"/"9.90"/"0.01")按"分"做数值比较，
+// 避免字符串比较把 "9.9" 和 "9.90" 当成不等而漏单。返回是否与期望分值一致。
+export function moneyMatchesCents(money: string | number | undefined | null, amountCents: number): boolean {
+  const n = Number(money)
+  if (!Number.isFinite(n)) return false
+  return Math.round(n * 100) === amountCents
+}
+
 export interface ZpayOrderInput {
   outTradeNo: string
   moneyYuan: string

@@ -49,7 +49,9 @@ textarea.field { resize: none; min-height: 96px; line-height: 1.5; }
 .chip.on { background: var(--brand); border-color: var(--brand); color: #fff; }
 .chip:disabled { opacity: 0.28; text-decoration: line-through; }
 
-.result { width: 100%; border-radius: 14px; border: 1px solid var(--edge); margin-top: 14px; display: block; }
+/* 结果图：限制最大高度，避免竖图/本地放大后(可达 2048px)等比撑满整屏、挡住滚动。
+   max-height + object-fit:contain 让长图收在一屏内，宽高自适应、保真不裁切。 */
+.result { max-width: 100%; max-height: 70vh; width: auto; height: auto; object-fit: contain; border-radius: 14px; border: 1px solid var(--edge); margin-top: 14px; display: block; }
 .statusCard { margin-top: 14px; padding: 14px; border-radius: 12px; background: var(--panel); border: 1px solid var(--edge); font-size: 14px; color: var(--muted); display: flex; align-items: center; gap: 10px; }
 .spin { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.25); border-top-color: var(--brand2); border-radius: 50%; animation: sp 0.8s linear infinite; }
 @keyframes sp { to { transform: rotate(360deg); } }
@@ -86,9 +88,28 @@ textarea.field { resize: none; min-height: 96px; line-height: 1.5; }
 .inputZone { border-top: 1px solid var(--edge); background: rgba(11, 8, 20, 0.92); backdrop-filter: blur(10px); padding: 8px 12px 10px; }
 .panel { background: var(--panel); border: 1px solid var(--edge); border-radius: 12px; padding: 12px; margin-bottom: 8px; max-height: 42vh; overflow-y: auto; }
 .toolbar { display: flex; gap: 8px; margin-bottom: 8px; }
-.toolBtn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 9px 4px; border-radius: 10px; background: var(--panel); border: 1px solid var(--edge); color: var(--text); font-size: 12px; }
+.toolBtn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 9px 4px; border-radius: 10px; background: var(--panel); border: 1px solid var(--edge); color: var(--text); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .toolBtn.on { border-color: var(--brand); color: var(--brand2); }
 .toolBtn svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+/* —— 即梦式紧凑布局 —— */
+/* 对话/生图模式 segmented（置于参考图区域上方）。.seg 也复用为设置面板内的小段切换。 */
+.modeSeg { display: flex; gap: 4px; padding: 3px; margin-bottom: 8px; border-radius: 12px; background: rgba(0, 0, 0, 0.28); border: 1px solid var(--edge); }
+.seg { display: flex; gap: 4px; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, 0.28); border: 1px solid var(--edge); }
+.segBtn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 8px 10px; border-radius: 9px; background: none; border: none; color: var(--muted); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.segBtn.on { background: linear-gradient(120deg, var(--brand), var(--brand2)); color: #fff; }
+.segBtn svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+/* 统一设置面板（画质档 + 模型 + 比例 + 高清整合到一处，减少纵向堆叠） */
+.setSheet { background: var(--panel); border: 1px solid var(--edge); border-radius: 12px; padding: 12px; margin-bottom: 8px; max-height: 46vh; overflow-y: auto; }
+.setRow { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.setRow .seg { flex: 1; }
+.setRow .chips { flex: 1; }
+.setBlock { margin-bottom: 10px; }
+.setBlock:last-child { margin-bottom: 0; }
+.setLabel { font-size: 12px; color: var(--muted); font-weight: 600; flex-shrink: 0; min-width: 40px; margin-bottom: 6px; }
+.setRow .setLabel { margin-bottom: 0; }
+.setHint { font-size: 11px; color: var(--muted); opacity: 0.8; margin: -2px 0 10px; }
 .inputRow { display: flex; gap: 8px; align-items: flex-end; }
 .inputRow textarea { flex: 1; padding: 11px 12px; border-radius: 12px; border: 1px solid var(--edge); background: rgba(0, 0, 0, 0.3); color: var(--text); font-size: 15px; outline: none; resize: none; min-height: 44px; max-height: 120px; line-height: 1.4; }
 .inputRow textarea:focus { border-color: var(--brand); }

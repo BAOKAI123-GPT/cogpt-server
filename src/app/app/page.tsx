@@ -357,7 +357,8 @@ function Generate({ models, meta, msgs, setMsgs, onQuota }: { models: string[]; 
   const [ratio, setRatio] = useState('1:1')
   const [hd, setHd] = useState('std')
   const [refs, setRefs] = useState<string[]>([])
-  const [panel, setPanel] = useState<'ref' | 'ratio' | 'hd' | null>(null)
+  // panel：底部弹出面板。'set'=画质/比例/高清统一设置（即梦式右侧设置整合到一个紧凑面板），'ref'=参考图上传方式选择。
+  const [panel, setPanel] = useState<'set' | 'ref' | null>(null)
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState('')
   const [canAbort, setCanAbort] = useState(false)
@@ -377,10 +378,11 @@ function Generate({ models, meta, msgs, setMsgs, onQuota }: { models: string[]; 
   const stdModels = models.filter((m) => meta[m]?.mode === 'standard')
   const qModels = models.filter((m) => meta[m]?.mode !== 'standard')
   function pickTier(t: 'standard' | 'quality'): void {
+    // 切到标准：清空参考图（标准档不支持参考图），但保留设置面板打开，方便继续调比例/高清。
     const list = t === 'standard' ? stdModels : qModels
-    if (!list.length || list.includes(model)) { if (t === 'standard') { setRefs([]); setPanel(null) }; return }
+    if (!list.length || list.includes(model)) { if (t === 'standard') { setRefs([]); setPanel('set') }; return }
     setModel(list[0])
-    if (t === 'standard') { setRefs([]); setPanel(null) }
+    if (t === 'standard') { setRefs([]); setPanel('set') }
   }
   useEffect(() => { if (!refAllowed && refs.length) setRefs([]) }, [refAllowed, refs.length])
 
@@ -477,7 +479,7 @@ function Generate({ models, meta, msgs, setMsgs, onQuota }: { models: string[]; 
       <input ref={editUpRef} type="file" accept="image/*" hidden onChange={(e) => { pickEditUpload(e.target.files); e.target.value = '' }} />
       <div className={s.results} ref={scrollRef}>
         {msgs.length === 0 && !busy && (
-          <div className={s.emptyHint}><b>描述你想要的画面，点右下角生成</b><br />例如：一只戴墨镜的柴犬，扁平插画，米色背景<br /><br />可在下方加「参考图」、选「比例」与「高清」</div>
+          <div className={s.emptyHint}><b>描述你想要的画面，点右下角生成</b><br />例如：一只戴墨镜的柴犬，扁平插画，米色背景<br /><br />可在下方加「参考图」，点「设置」切画质 / 比例 / 高清</div>
         )}
         {msgs.map((m, i) => m.role === 'user' ? (
           <div className={s.msgUser} key={i}><div><div className={s.bubble} {...(m.text ? longPress((x, y) => textMenu(x, y, m.text!)) : {})}>{m.text}</div>{m.refs && m.refs.length > 0 && <div className={s.msgRefs}>{m.refs.map((r, j) => <img key={j} src={r} alt="参考图" />)}</div>}</div></div>
@@ -499,29 +501,59 @@ function Generate({ models, meta, msgs, setMsgs, onQuota }: { models: string[]; 
         {busy && <div className={s.statusCard}><span className={s.spin} />{status || '正在生成…'}{canAbort && <button onClick={() => cancelRef.current?.()} style={{ marginLeft: 12, background: 'rgba(255,255,255,.12)', border: '1px solid var(--edge)', borderRadius: 8, color: 'var(--text)', padding: '4px 12px', fontSize: 13 }}>中止</button>}</div>}
       </div>
       <div className={s.inputZone}>
-        {mode === 'gen' && panel === 'ref' && (<div className={s.panel}><div className={s.secTitle}>上传参考图（让 AI 参考其风格/构图，最多 4 张）</div><div className={s.uploadRow}><button className={s.uploadBtn} onClick={() => camRef.current?.click()}><IconCamera />拍照</button><button className={s.uploadBtn} onClick={() => albRef.current?.click()}><IconAlbum />从相册选择</button></div><button className={`${s.btn} ${s.btnGhost}`} style={{ marginTop: 10 }} onClick={() => editUpRef.current?.click()}><IconBrush /> 上传图片做局部重绘/编辑</button></div>)}
-        {mode === 'gen' && panel === 'ratio' && (<div className={s.panel}>{!anyRatio(model) && <div className={s.secTitle} style={{ color: '#ffd27a' }}>当前「{mLabel(model)}」仅支持 3 种比例，需要 9:16 等请切「高质量」</div>}{(['方形', '竖版', '横版'] as const).map((g) => (<div key={g}><div className={s.secTitle}>{g}</div><div className={s.chips} style={{ marginBottom: 8 }}>{RATIOS.filter((r) => r.g === g).map((r) => { const ok = ratioOK(model, r.k); return <button key={r.k} disabled={!ok} className={`${s.chip} ${r.k === ratio ? s.on : ''}`} onClick={() => { if (ok) { setRatio(r.k); setPanel(null) } }}>{r.k}</button> })}</div></div>))}</div>)}
-        {mode === 'gen' && panel === 'hd' && (<div className={s.panel}><div className={s.secTitle}>高清模式（生成后本地放大，越高越清晰越慢）</div><div className={s.chips}>{HD.map((h) => <button key={h.k} className={`${s.chip} ${h.k === hd ? s.on : ''}`} onClick={() => { setHd(h.k); setPanel(null) }}>{h.t}</button>)}</div></div>)}
-        {mode === 'gen' && stdModels.length > 0 && qModels.length > 0 && (
-          <div className={s.chips} style={{ marginBottom: 8, alignItems: 'center' }}>
-            <button className={`${s.chip} ${isStd ? s.on : ''}`} onClick={() => pickTier('standard')}>标准</button>
-            <button className={`${s.chip} ${!isStd ? s.on : ''}`} onClick={() => pickTier('quality')}>高质量</button>
-            <span style={{ fontSize: 12, opacity: 0.6, marginLeft: 4 }}>本次扣 {curMeta.credits} 额度{isStd ? '' : '（可切模型/参考图/全比例）'}</span>
+        {/* ① 对话/生图模式 segmented：置于参考图区域上方，点击切换。 */}
+        <div className={s.modeSeg}>
+          <button className={`${s.segBtn} ${mode === 'gen' ? s.on : ''}`} onClick={() => setMode('gen')}><IconGen />生图</button>
+          <button className={`${s.segBtn} ${mode === 'chat' ? s.on : ''}`} onClick={() => { setMode('chat'); setPanel(null) }}><IconQuote />对话</button>
+        </div>
+
+        {/* 参考图区域（缩略图）—— 紧贴模式切换之下 */}
+        {mode === 'gen' && refs.length > 0 && (<div className={s.thumbs}>{refs.map((src, i) => (<div key={i} className={s.thumb}><img src={src} alt="参考图" /><button className={s.thumbX} onClick={() => setRefs((p) => p.filter((_, j) => j !== i))}>×</button></div>))}</div>)}
+        {mode === 'gen' && refs.length >= 3 && (<div className={s.secTitle} style={{ color: '#ffd27a' }}>参考图越多生成越慢、越容易超时，建议精简到 1–2 张</div>)}
+
+        {/* 弹出设置面板（即梦式：把标准/高质量档位 + 画质 + 高质量模型 + 比例整合到一个紧凑面板，从下方设置栏弹起）。 */}
+        {mode === 'gen' && panel === 'set' && (
+          <div className={s.setSheet}>
+            {/* ② 画质档位：标准 / 高质量 */}
+            {stdModels.length > 0 && qModels.length > 0 && (<>
+              <div className={s.setRow}>
+                <span className={s.setLabel}>画质档</span>
+                <div className={s.seg}>
+                  <button className={`${s.segBtn} ${isStd ? s.on : ''}`} onClick={() => pickTier('standard')}>标准</button>
+                  <button className={`${s.segBtn} ${!isStd ? s.on : ''}`} onClick={() => pickTier('quality')}>高质量</button>
+                </div>
+              </div>
+              <div className={s.setHint}>本次扣 {curMeta.credits} 额度{isStd ? '（通用 3 比例）' : '（可换模型 / 参考图 / 全比例）'}</div>
+            </>)}
+            {/* ③ 高质量档展开模型选择：高质量GPT / Nano Banana */}
+            {!isStd && qModels.length > 1 && (
+              <div className={s.setRow}>
+                <span className={s.setLabel}>模型</span>
+                <div className={s.chips}>{qModels.map((m) => <button key={m} className={`${s.chip} ${m === model ? s.on : ''}`} onClick={() => setModel(m)}>{mLabel(m)}</button>)}</div>
+              </div>
+            )}
+            {/* 比例 */}
+            <div className={s.setBlock}>
+              <div className={s.setLabel}>比例 {!anyRatio(model) && <span style={{ color: '#ffd27a', fontWeight: 400 }}>（{mLabel(model)} 仅 3 比例，9:16 等请切高质量）</span>}</div>
+              <div className={s.chips}>{RATIOS.map((r) => { const ok = ratioOK(model, r.k); return <button key={r.k} disabled={!ok} className={`${s.chip} ${r.k === ratio ? s.on : ''}`} onClick={() => { if (ok) setRatio(r.k) }}>{r.k}</button> })}</div>
+            </div>
+            {/* 高清 */}
+            <div className={s.setBlock}>
+              <div className={s.setLabel}>高清（生成后本地放大，越高越清越慢）</div>
+              <div className={s.chips}>{HD.map((h) => <button key={h.k} className={`${s.chip} ${h.k === hd ? s.on : ''}`} onClick={() => setHd(h.k)}>{h.t}</button>)}</div>
+            </div>
           </div>
         )}
-        {mode === 'gen' && !isStd && qModels.length > 1 && (<div className={s.chips} style={{ marginBottom: 8 }}>{qModels.map((m) => <button key={m} className={`${s.chip} ${m === model ? s.on : ''}`} onClick={() => setModel(m)}>{mLabel(m)}</button>)}</div>)}
-        {refs.length > 0 && (<div className={s.thumbs}>{refs.map((src, i) => (<div key={i} className={s.thumb}><img src={src} alt="参考图" /><button className={s.thumbX} onClick={() => setRefs((p) => p.filter((_, j) => j !== i))}>×</button></div>))}</div>)}
-        {refs.length >= 3 && (<div className={s.secTitle} style={{ color: '#ffd27a' }}>参考图越多生成越慢、越容易超时，建议精简到 1–2 张</div>)}
-        <div className={s.chips} style={{ marginBottom: 8 }}>
-          <button className={`${s.chip} ${mode === 'chat' ? s.on : ''}`} onClick={() => setMode('chat')}>对话模式</button>
-          <button className={`${s.chip} ${mode === 'gen' ? s.on : ''}`} onClick={() => setMode('gen')}>生图模式</button>
-        </div>
+
+        {/* 参考图上传方式选择面板 */}
+        {mode === 'gen' && panel === 'ref' && (<div className={s.setSheet}><div className={s.secTitle}>上传参考图（让 AI 参考其风格/构图，最多 4 张）</div><div className={s.uploadRow}><button className={s.uploadBtn} onClick={() => camRef.current?.click()}><IconCamera />拍照</button><button className={s.uploadBtn} onClick={() => albRef.current?.click()}><IconAlbum />从相册选择</button></div><button className={`${s.btn} ${s.btnGhost}`} style={{ marginTop: 10 }} onClick={() => editUpRef.current?.click()}><IconBrush /> 上传图片做局部重绘/编辑</button></div>)}
+
+        {/* 生图模式工具栏：参考图入口 + 一个常驻「设置」按钮（汇总画质/比例/高清，点开上方面板）。 */}
         {mode === 'gen' && (
-        <div className={s.toolbar}>
-          {refAllowed && <button className={`${s.toolBtn} ${panel === 'ref' ? s.on : ''}`} onClick={() => setPanel(panel === 'ref' ? null : 'ref')}><IconImg />参考图{refs.length ? `(${refs.length})` : ''}</button>}
-          <button className={`${s.toolBtn} ${panel === 'ratio' ? s.on : ''}`} onClick={() => setPanel(panel === 'ratio' ? null : 'ratio')}><IconRatio />比例 {ratio}</button>
-          <button className={`${s.toolBtn} ${panel === 'hd' ? s.on : ''}`} onClick={() => setPanel(panel === 'hd' ? null : 'hd')}><IconHD />{hdLabel}</button>
-        </div>
+          <div className={s.toolbar}>
+            {refAllowed && <button className={`${s.toolBtn} ${panel === 'ref' ? s.on : ''}`} onClick={() => setPanel(panel === 'ref' ? null : 'ref')}><IconImg />参考图{refs.length ? `(${refs.length})` : ''}</button>}
+            <button className={`${s.toolBtn} ${panel === 'set' ? s.on : ''}`} onClick={() => setPanel(panel === 'set' ? null : 'set')}><IconHD />{isStd ? '标准' : '高质量'} · {ratio} · {hdLabel}</button>
+          </div>
         )}
         <div className={s.inputRow}>
           <textarea placeholder={mode === 'chat' ? '说说你想要的图，我帮你聊清楚（想好了回复「生成」即可出图）' : '描述你想要的画面…'} value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={1} />

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { currentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
-import { queryZpayOrder } from '@/lib/zpay'
+import { queryZpayOrder, moneyMatchesCents } from '@/lib/zpay'
 import { settlePaidOrder } from '@/lib/grant'
 
 // 查询某笔订单是否已支付（客户端展示二维码后轮询，付款成功即自动到账+刷新额度）。
@@ -16,7 +16,8 @@ export async function GET(req: Request): Promise<Response> {
 
   if (order.status !== 'paid') {
     const q = await queryZpayOrder(outTradeNo)
-    if (q && q.paid && q.money === (order.amountCents / 100).toFixed(2)) {
+    // 金额比较用数值（分），避免 "9.9" vs "9.90" 这类等值字符串不相等导致兜底查单不入账。
+    if (q && q.paid && moneyMatchesCents(q.money, order.amountCents)) {
       await settlePaidOrder(outTradeNo, q.tradeNo)
       order = await prisma.order.findUnique({ where: { outTradeNo } })
     }

@@ -13,6 +13,30 @@ function startOfToday(): Date {
   return d
 }
 
+// 发往中转站的提示词上限：超长 prompt 会显著拉高上游推理耗时、容易触发超时。
+// 超过则截断保留前部（已是较宽松的上限，正常创作不会触达）。
+const MAX_PROMPT_CHARS = 4000
+
+// 把上游英文/技术错误映射成用户能懂的中文提示；保留原文进日志（GenLog + pm2 relay-fail 仍是原始英文）。
+function friendlyError(raw?: string): string {
+  const e = String(raw || '')
+  const low = e.toLowerCase()
+  // 安全策略拒绝（429 安全拒绝 / "rejected by the safety" / "safety"）
+  if (/rejected by the safety|safety system|safety|content_policy|content policy|违规|敏感/i.test(e))
+    return '提示词或参考图被安全策略拒绝，请调整内容后重试'
+  // 尺寸/比例不被该上游支持（"size must be one of ..." / "Invalid size"）
+  if (/size must be one of|invalid size|unsupported size|不支持.*尺寸|不支持.*size/i.test(e))
+    return '当前比例该模型暂不支持，请换 1:1 / 2:3 / 3:2 后重试'
+  // 上游饱和/排队（"负载已饱和" / overloaded / rate limit / busy）
+  if (/负载已饱和|overloaded|rate.?limit|too many requests|server is busy|busy|繁忙|饱和/i.test(low + e))
+    return '当前生图通道繁忙，请稍后再试或换个模型'
+  // 上游超时
+  if (/timeout|timed out|超时/i.test(low))
+    return '生图超时了，可能是网络或上游繁忙，请稍后再试'
+  // 其余保持原文（已是中文为主的友好文案，如"当前模型暂无支持…画幅的中转站"）
+  return e || '生成失败，请稍后再试'
+}
+
 export async function POST(req: Request): Promise<Response> {
   const u = await currentUser(req)
   if (!u) return NextResponse.json({ error: '未登录' }, { status: 401 })
@@ -57,6 +81,12 @@ export async function POST(req: Request): Promise<Response> {
       } else {
         return { status: 400, body: { error: '请输入图片描述（提示词不能为空）' } }
       }
+    }
+
+    // 提示词上限：超长 prompt 会拖垮上游推理、易超时。超过则截断保留前部并记录。
+    if (promptStr.length > MAX_PROMPT_CHARS) {
+      console.warn('[generate] prompt 超长已截断', { userId: u.id, model, origLen: promptStr.length, max: MAX_PROMPT_CHARS })
+      promptStr = promptStr.slice(0, MAX_PROMPT_CHARS)
     }
 
     // —— 内容审核：命中违规词直接拦截并留痕（不调用中转站、不扣费） ——
@@ -123,8 +153,8 @@ export async function POST(req: Request): Promise<Response> {
       .catch(() => {})
 
     if (!r.ok) {
-      // 失败不扣额度（也不缓存，允许客户端重试）
-      return { status: 502, body: { error: r.error } }
+      // 失败不扣额度（也不缓存，允许客户端重试）。原始错误已落 GenLog + pm2，返回前端用友好中文。
+      return { status: 502, body: { error: friendlyError(r.error) } }
     }
     await consume(u.id, credits)
     const fresh = await prisma.user.findUnique({ where: { id: u.id } })

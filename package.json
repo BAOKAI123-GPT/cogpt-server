@@ -10,6 +10,7 @@
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
     "seed": "node --import tsx scripts/seed.ts",
+    "test": "node --import tsx --test scripts/test-zpay.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

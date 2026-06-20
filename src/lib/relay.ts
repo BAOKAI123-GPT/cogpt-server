@@ -61,6 +61,28 @@ async function withTimeout<T>(ms: number, fn: (s: AbortSignal) => Promise<T>, ex
 // 避免旧的 300s 干等（还会长时间占用单用户并发锁，导致重试也被挡）。
 const GEN_TIMEOUT = 98_000 // 略低于 Cloudflare ~100s 上限，尽量救回 90–98s 才完成的生图
 
+// 中转站失败/超时结构化日志：进 pm2，便于排查"哪个站、什么模型、HTTP 几、报了什么、耗时多少"。
+// 绝不打印 key（这些字段里也不含 key）。错误文案截断 200 字防刷屏。
+function logRelayFail(info: {
+  relayId: string
+  format: string
+  model: string
+  status?: number
+  ms: number
+  error?: string
+  aborted?: boolean
+}): void {
+  console.warn('[relay-fail]', {
+    relayId: info.relayId,
+    format: info.format,
+    model: info.model,
+    status: info.status ?? '',
+    aborted: !!info.aborted,
+    ms: info.ms,
+    error: String(info.error ?? '').slice(0, 200)
+  })
+}
+
 export interface GenInput {
   prompt: string
   size?: string
@@ -74,6 +96,7 @@ export interface GenResult {
   text?: string
   error?: string
   aborted?: boolean
+  status?: number // 上游 HTTP 状态（失败时填，用于结构化日志/错误映射）
   relayId?: string // 实际成功出图的中转站 id（落库 GenLog，用于每站统计）
   relayMs?: number // 该站本次耗时(ms)
 }
@@ -81,7 +104,7 @@ export interface GenResult {
 async function parseImages(res: Response): Promise<GenResult> {
   if (!res.ok) {
     const body = await res.text().catch(() => '')
-    return { ok: false, images: [], error: `生图失败 ${res.status}：${body.slice(0, 300) || res.statusText}` }
+    return { ok: false, images: [], status: res.status, error: `生图失败 ${res.status}：${body.slice(0, 300) || res.statusText}` }
   }
   const json: any = await res.json()
   const data: any[] = Array.isArray(json?.data) ? json.data : []
@@ -162,7 +185,7 @@ async function viaChat(base: string, key: string, model: string, x: GenInput, ex
   )
   if (!res.ok) {
     const body = await res.text().catch(() => '')
-    return { ok: false, images: [], error: `生图失败 ${res.status}：${body.slice(0, 300) || res.statusText}` }
+    return { ok: false, images: [], status: res.status, error: `生图失败 ${res.status}：${body.slice(0, 300) || res.statusText}` }
   }
   const json: any = await res.json()
   const msg = json?.choices?.[0]?.message
@@ -396,7 +419,7 @@ async function highwayGen(relay: RelayCfg, x: GenInput, ext?: AbortSignal): Prom
     )
     if (!res.ok) {
       const t = await res.text().catch(() => '')
-      return { ok: false, images: [], error: `接口AI ${res.status}：${t.slice(0, 200)}` }
+      return { ok: false, images: [], status: res.status, error: `接口AI ${res.status}：${t.slice(0, 200)}` }
     }
     const j: any = await res.json().catch(() => ({}))
     const urls: any[] = Array.isArray(j?.images)
@@ -498,35 +521,31 @@ export async function relayStats(): Promise<Record<string, RelayStat>> {
   return out
 }
 
-/** 按文档「最便宜→最快→成功率最高」自动排失败切换链；自动剔除最近成功率过低的死站。manual 模式保持配置顺序。 */
+/** 先便宜再求稳：按每张价格升序排失败切换链；最近成功率过低的"死站"垫到最后避免浪费时间。manual 模式保持配置顺序。 */
 async function orderRelays(relays: RelayCfg[]): Promise<RelayCfg[]> {
   if (relays.length <= 1) return relays
   if (((await getConfig('relay_order_mode')) || 'auto') === 'manual') return relays
   const stats = await relayStats()
   const minRate = Number(await getConfig('relay_health_min')) || 0.25
-  // 跳死站：样本≥5 且成功率<阈值。全被跳光则退回原列表，避免无站可用。
-  const healthy = relays.filter((r) => {
+  // 死站：近24h 样本≥5 且成功率<阈值（如已挂的青云 image2）。
+  const isDead = (r: RelayCfg): boolean => {
     const s = stats[r.id]
-    return !s || s.total < 5 || s.rate >= minRate
-  })
-  const pool = healthy.length ? healthy : relays
-  const ms = (r: RelayCfg): number => stats[r.id]?.avgMs || 999_999
-  const rate = (r: RelayCfg): number => (stats[r.id] && stats[r.id].total >= 3 ? stats[r.id].rate : 0.5)
-  const cheapest = [...pool].sort((a, b) => a.price - b.price)[0]
-  const fastest = [...pool].sort((a, b) => ms(a) - ms(b))[0]
-  const reliable = [...pool].sort((a, b) => rate(b) - rate(a))[0]
-  const chain: RelayCfg[] = []
-  for (const r of [cheapest, fastest, reliable, ...pool]) {
-    if (r && !chain.some((c) => c.id === r.id)) chain.push(r)
+    return !!s && s.total >= 5 && s.rate < minRate
   }
-  return chain
+  const byPrice = [...relays].sort((a, b) => a.price - b.price) // 先便宜
+  const alive = byPrice.filter((r) => !isDead(r))
+  const dead = byPrice.filter((r) => isDead(r)) // 再求稳：死站垫底
+  return [...alive, ...dead]
 }
 
 /** 多中转站代发生图：能力过滤(参考图/画幅) → 自动排序(便宜→快→稳、跳死站) → 依次尝试，出图即返回。
  *  ext：客户端"中止"信号——用户主动中止则不再换站；单站超时则自动切下一站。未出图即不扣费。 */
 export async function generate(x: GenInput, ext?: AbortSignal): Promise<GenResult> {
   const all = await getModelRelays(x.model)
-  if (!all.length) return { ok: false, images: [], error: '后台未配置中转站' }
+  if (!all.length) {
+    console.warn('[relay-fail]', { model: x.model, error: '该模型未配置任何中转站' })
+    return { ok: false, images: [], error: '后台未配置中转站' }
+  }
   // 按任务需求过滤中转站：带参考图改图→只用支持参考图的站；特殊画幅→只用支持该画幅的站。
   const hasRef = !!(x.initImages && x.initImages.length)
   const ratio = sizeToRatio(x.size)
@@ -536,6 +555,7 @@ export async function generate(x: GenInput, ext?: AbortSignal): Promise<GenResul
     return true
   })
   if (!capable.length) {
+    console.warn('[relay-fail]', { model: x.model, ratio, hasRef, error: '能力过滤后无可用中转站（参考图/画幅不被任何站支持）' })
     return {
       ok: false,
       images: [],
@@ -559,6 +579,7 @@ export async function generate(x: GenInput, ext?: AbortSignal): Promise<GenResul
       if (ext.aborted) ac.abort()
       else ext.addEventListener('abort', onAbort)
     }
+    const tRelay = Date.now()
     try {
       const r =
         relay.format === 'suchuang'
@@ -571,8 +592,24 @@ export async function generate(x: GenInput, ext?: AbortSignal): Promise<GenResul
         return r
       }
       last = r
+      // 结构化失败日志（每个站每次失败都进 pm2，根治"失败不进日志"无法排查的问题）。
+      logRelayFail({
+        relayId: relay.id,
+        format: relay.format,
+        model: x.model,
+        status: r.status,
+        ms: Date.now() - tRelay,
+        error: r.error,
+        aborted: r.aborted
+      })
       if (ext?.aborted) return { ...r, aborted: true } // 用户主动中止：不再换站
       // 否则（本站超时/报错）→ 继续尝试下一个站
+    } catch (e: any) {
+      // 适配器层一般已 try/catch，这里兜底捕获意外异常并记录，避免整次生图静默崩溃不进日志。
+      const aborted = e?.name === 'AbortError'
+      last = { ok: false, images: [], aborted, error: aborted ? '生图超时/已中止' : `生图异常：${e?.message ?? e}` }
+      logRelayFail({ relayId: relay.id, format: relay.format, model: x.model, ms: Date.now() - tRelay, error: last.error, aborted })
+      if (ext?.aborted) return { ...last, aborted: true }
     } finally {
       clearTimeout(timer)
       if (ext) ext.removeEventListener('abort', onAbort)

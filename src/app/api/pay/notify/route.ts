@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db'
-import { verifyZpayNotify } from '@/lib/zpay'
+import { verifyZpayNotify, moneyMatchesCents } from '@/lib/zpay'
 import { settlePaidOrder } from '@/lib/grant'
 
 function ok(): Response {
@@ -20,7 +20,8 @@ export async function GET(req: Request): Promise<Response> {
 
   const order = await prisma.order.findUnique({ where: { outTradeNo: data.out_trade_no } })
   if (!order) return fail('no-order')
-  if (String(data.money) !== (order.amountCents / 100).toFixed(2)) return fail('amount-mismatch')
+  // 金额比较用数值（分），避免 "9.9" vs "9.90" 这类等值字符串不相等导致漏单。
+  if (!moneyMatchesCents(data.money, order.amountCents)) return fail('amount-mismatch')
 
   await settlePaidOrder(order.outTradeNo, data.trade_no ?? null)
   return ok()

@@ -1,0 +1,130 @@
+// cogpt 后端数据模型（SQLite）
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./cogpt.db"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  phone     String   @unique
+  createdAt DateTime @default(now())
+
+  // 会员
+  memberTier      String    @default("none") // none | basic | plus | ultra
+  memberExpiresAt DateTime?
+  memberCredits   Int       @default(0) // 会员月额度剩余
+
+  // 每日免费
+  freeDate String @default("") // YYYY-MM-DD
+  freeUsed Int    @default(0)
+
+  // GPT 对话：每次对话计 0.5 次生图额度，用半次累加器（满 1 次扣 1）
+  chatHalf Int @default(0)
+
+  // —— 邀请码 / 拉新 ——
+  inviteCode  String? @unique // 本人的邀请码（分享给别人）
+  invitedBy   String? // 注册时填的邀请人 userId（只设一次）
+  inviteCount Int     @default(0) // 成功拉新人数
+  bonusCredits Int    @default(0) // 赠送的生图次数（拉新/被拉获得，随时可用、不依赖会员）
+
+  // —— 翰文（文书）产品：按套餐的“每周刷新”token 额度 ——
+  wsTier       String    @default("none") // none | basic | plus | ultra
+  wsExpiresAt  DateTime? // 月度订阅到期
+  wsWeekTokens Int       @default(0) // 本周剩余 token 额度
+  wsWeekStart  DateTime? // 本周窗口起点（每 7 天刷新）
+
+  disabled Boolean @default(false) // 管理员可封禁
+
+  orders    Order[]
+  gens      GenLog[]
+  agentLogs AgentLog[]
+}
+
+model Order {
+  id          String    @id @default(cuid())
+  outTradeNo  String    @unique
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  tier        String // basic | plus | ultra
+  product     String    @default("cogpt") // cogpt(生图) | wenshu(文书)
+  amountCents Int
+  status      String    @default("pending") // pending | paid | failed
+  zpayTradeNo String?
+  createdAt   DateTime  @default(now())
+  paidAt      DateTime?
+}
+
+// 生图记录（计量 / 排查；成功才计费）
+model GenLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  model     String
+  ok        Boolean
+  source    String // member | free
+  error     String? // 失败原因（成功为空），用于后台排查
+  ms        Int? // 本次生图耗时(毫秒)
+  relayId   String? // 实际出图的中转站 id（用于每站成功率/速度统计与自动排序）
+  prompt    String? // 提示词留存（内容审核 / 违规追溯）
+  createdAt DateTime @default(now())
+
+  @@index([relayId, createdAt])
+}
+
+// 翰文对话记录（计量 token / 排查 / 越界审计；成功才扣额度）
+model AgentLog {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  model        String
+  ok           Boolean
+  tokens       Int      @default(0) // 本次消耗 token（usage.total_tokens 或估算）
+  source       String   @default("member")
+  scopeBlocked Boolean  @default(false) // 因超出文员范围被拦截
+  error        String?
+  ms           Int?
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+}
+
+// 后台可改的全部配置（中转站、套餐、短信开关等）
+model Config {
+  key   String @id
+  value String
+}
+
+// 短信发码频控占位（真实验证码由阿里云端生成/校验）
+model SmsCode {
+  id        String   @id @default(cuid())
+  phone     String
+  ip        String? // 发码来源 IP，用于防刷限频
+  createdAt DateTime @default(now())
+
+  @@index([phone, createdAt])
+  @@index([ip, createdAt])
+  @@index([createdAt])
+}
+
+model Admin {
+  id           String @id @default(cuid())
+  username     String @unique
+  passwordHash String
+  totpSecret   String // 2FA TOTP 密钥（base32）
+}
+
+// 墨童（文书）用户数据跨端同步：记忆库/信息库按 userId+kind 存 JSON，
+// 网页与客户端同账号互通、永久保存、更新不丢（云端为准，last-write-wins）。
+model WsUserData {
+  userId    String
+  kind      String // memory | info
+  json      String   @default("[]")
+  updatedAt DateTime @updatedAt
+
+  @@id([userId, kind])
+}

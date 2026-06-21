@@ -1,8 +1,10 @@
+import type { CSSProperties } from 'react'
 import s from './page.module.css'
 import { Logo } from './Logo'
 import { getTiers, getConfig } from '@/lib/config'
 import { IcChat, IcBrush, IcImage, IcVector, IcZoom, IcShield, IcSparkles, IcGlobe, IcPhone, IcZap, IcCheck, IcDownload } from './icons'
 import { DownloadGuide } from './DownloadGuide'
+import { Motion } from './Motion'
 
 // 始终服务端实时渲染：读取后台可改的价格/下载链接，改完即时生效
 export const dynamic = 'force-dynamic'
@@ -45,11 +47,13 @@ export default async function Home() {
 
   return (
     <div className={s.page}>
+      <Motion />
       <div className={s.glows}>
         <div className={`${s.glow} ${s.glow1}`} />
         <div className={`${s.glow} ${s.glow2}`} />
         <div className={`${s.glow} ${s.glow3}`} />
       </div>
+      <div className={s.grain} aria-hidden="true" />
 
       {/* 导航 */}
       <nav className={s.nav}>
@@ -116,8 +120,8 @@ export default async function Home() {
         <h2 className={s.h2}>AI 生图效果展示</h2>
         <p className={s.subtle}>以下作品均由 Co-GPT 生成。从产品渲染到人像、海报、概念场景，一句话即可创作。</p>
         <div className={s.gallery} style={{ marginTop: 34 }}>
-          {shots.map((f) => (
-            <div key={f} className={s.shot}>
+          {shots.map((f, i) => (
+            <div key={f} className={s.shot} data-reveal style={{ '--rd': `${i * 60}ms` } as CSSProperties}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={`/showcase/${f}.webp`} alt="Co-GPT 生成作品" loading="lazy" />
             </div>
@@ -130,8 +134,8 @@ export default async function Home() {
         <span className={s.kicker}>Features</span>
         <h2 className={s.h2}>为创作而生的工具箱</h2>
         <div className={s.features}>
-          {FEATURES.map((f) => (
-            <div key={f.t} className={s.fcard}>
+          {FEATURES.map((f, i) => (
+            <div key={f.t} className={s.fcard} data-reveal data-spotlight style={{ '--rd': `${i * 70}ms` } as CSSProperties}>
               <div className={s.ficon}>{f.icon}</div>
               <h3>{f.t}</h3>
               <p>{f.d}</p>
@@ -146,8 +150,8 @@ export default async function Home() {
         <h2 className={s.h2}>按月会员，额度透明</h2>
         <p className={s.subtle}>所有套餐统一使用云端模型，按月开通、到期失效。生图失败不消耗次数。</p>
         <div className={s.tiers}>
-          {tiers.map((t) => (
-            <div key={t.id} className={`${s.tier} ${t.id === 'plus' ? s.tierHot : ''}`}>
+          {tiers.map((t, i) => (
+            <div key={t.id} className={`${s.tier} ${t.id === 'plus' ? s.tierHot : ''}`} data-reveal data-spotlight style={{ '--rd': `${i * 70}ms` } as CSSProperties}>
               {t.id === 'plus' && <span className={s.tierTag}>最受欢迎</span>}
               <div className={s.tierName}>{t.name}</div>
               <div className={s.price}>¥{t.priceCents / 100}<small> /月</small></div>
@@ -169,7 +173,7 @@ export default async function Home() {
         <span className={s.kicker}>Download</span>
         <h2 className={s.h2}>立即开始创作</h2>
         <DownloadGuide />
-        <div className={s.dlCard}>
+        <div className={s.dlCard} data-reveal>
           <div style={{ fontSize: 14, color: '#fff', fontWeight: 600, marginBottom: 10 }}>电脑版</div>
           <div className={s.dlBtns}>
             <DownloadBtn url={winUrl} label="下载 Windows 版" sub="Win 10/11" />

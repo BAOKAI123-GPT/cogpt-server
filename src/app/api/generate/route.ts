@@ -42,7 +42,7 @@ export async function POST(req: Request): Promise<Response> {
   if (!u) return NextResponse.json({ error: '未登录' }, { status: 401 })
 
   const body = await req.json().catch(() => ({}))
-  const { prompt, size, model, initImages, mask, reqId } = body
+  const { prompt, size, model, initImages, mask, reqId, hdEdge } = body
   const rid = typeof reqId === 'string' && reqId ? reqId : crypto.randomUUID()
 
   // —— 幂等：命中缓存/在途，直接复用，避免重试重复生成与重复扣费 ——
@@ -100,13 +100,33 @@ export async function POST(req: Request): Promise<Response> {
       return { status: 400, body: { error: '提示词包含违规内容，已被拦截，请修改后重试' } }
     }
 
-    // 本次扣多少额度：高质量模型(image2/Nano Banana)=2，标准(light)=1，按 model_credits 配置
-    let credits = 1
+    // —— 本次扣多少点数（方案B 点数制）：基础(按模型) + 多参考图加价 + 高清加价 ——
+    // 标准10 / 高质量GPT20 / Gemini30；多1张参考图+ref_extra_points；高清按 hdEdge 阈值加点。
+    let credits = 10
     try {
       const mc = JSON.parse((await getConfig('model_credits')) || '{}')
       if (typeof mc?.[useModel] === 'number' && mc[useModel] > 0) credits = mc[useModel]
     } catch {
-      /* 默认 1 */
+      /* 默认 10 */
+    }
+    // 多参考图：>1 张时每多 1 张加点（首张不加）
+    if (hasRef && initImages.length > 1) {
+      const refExtra = Number(await getConfig('ref_extra_points')) || 0
+      credits += refExtra * (initImages.length - 1)
+    }
+    // 高清：客户端传 hdEdge(目标长边像素)，取 hdEdge≥阈值中的最大加点。高清=本地放大无API成本，属可调利润杠杆。
+    const edge = Number(hdEdge) || 0
+    if (edge > 0) {
+      try {
+        const hs = JSON.parse((await getConfig('hd_surcharge')) || '{}')
+        let add = 0
+        for (const [thr, pts] of Object.entries(hs)) {
+          if (edge >= Number(thr) && Number(pts) > add) add = Number(pts)
+        }
+        credits += add
+      } catch {
+        /* 无高清加价 */
+      }
     }
 
     // 额度判定（会员优先，否则每日免费；单一来源需能覆盖本次 credits）

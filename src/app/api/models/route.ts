@@ -27,9 +27,20 @@ export async function GET(): Promise<Response> {
   for (const m of models) {
     meta[m] = {
       mode: mode[m] === 'standard' ? 'standard' : 'quality',
-      credits: Number(credits[m]) > 0 ? Number(credits[m]) : 1,
+      credits: Number(credits[m]) > 0 ? Number(credits[m]) : 10,
       ref: await modelRefSupported(m)
     }
   }
-  return NextResponse.json({ models, meta })
+  // 定价规则（点数制）：客户端据此显示预估扣点（多参考图/高清加价）。扣费仍以服务端为准。
+  let hdSurcharge: Record<string, number> = {}
+  try {
+    hdSurcharge = JSON.parse((await getConfig('hd_surcharge')) || '{}')
+  } catch {
+    hdSurcharge = {}
+  }
+  const pricing = {
+    refExtraPoints: Number(await getConfig('ref_extra_points')) || 0,
+    hdSurcharge // { 长边阈值: 加点 }
+  }
+  return NextResponse.json({ models, meta, pricing })
 }

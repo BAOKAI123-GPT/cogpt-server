@@ -24,12 +24,24 @@ export const CONFIG_DEFAULTS: Record<string, string> = {
   // 自动优先级：auto=按实测(便宜→快→稳)自动排序+跳死站；manual=保持 model_relays 配置顺序
   relay_order_mode: 'auto',
   relay_health_min: '0.25', // 近24h样本≥5且成功率<此值的站，自动跳过(死站)
-  // 两档质量模式：模型→所属模式(standard|quality) 与 模型→扣额度
+  // —— 模型熔断/告警/自动恢复（站×模型粒度，内存计数+Config持久化禁用窗口，无需cron）——
+  circuit_consec_fail: '5', // 1小时内同一(模型×中转站)连续失败N次 → 熔断
+  circuit_30min_fail: '10', // 30分钟内同一(模型×中转站)累计失败N次 → 熔断
+  circuit_disable_hours: '2', // 熔断后临时下架小时数，到点请求时惰性自动恢复
+  relay_disabled: '{}', // 已熔断窗口 {"<model>|<relayId>": 到期毫秒}，过期自动失效（后台 RelayManager 可见）
+  // 两档质量模式：模型→所属模式(standard|quality) 与 模型→扣点数
   model_mode: '{"gpt-image-2-light":"standard","gpt-image-2":"quality","gemini-2.5-flash-image":"quality"}',
-  model_credits: '{"gpt-image-2-light":1,"gpt-image-2":2,"gemini-2.5-flash-image":2}',
-  free_daily: '2',
-  invite_referrer_bonus: '30', // 拉人成功，邀请人得（次）
-  invite_referee_bonus: '10', // 被拉新用户得（次）
+  // —— 点数制（方案B）：1 旧额度 = 10 点。标准10 / 高质量GPT20 / Gemini30(=1.5×GPT，成本最高故最贵) ——
+  model_credits: '{"gpt-image-2-light":10,"gpt-image-2":20,"gemini-2.5-flash-image":30}',
+  // 多参考图加价：每多 1 张参考图(>1)额外加点（多图上传慢、易超时、占上游更多）。
+  ref_extra_points: '5',
+  // 高清加价：按本地放大目标长边阈值加点（高清=本地放大，对我方零API成本，属产品/利润杠杆，可调 0 关闭）。
+  // 客户端在生图请求里带 hdEdge(目标长边像素)；服务端取 hdEdge≥阈值中的最大点数。
+  hd_surcharge: '{"2048":5,"4096":10}',
+  free_daily: '20', // 每日免费点数（=2 次标准）
+  invite_referrer_bonus: '100', // 拉人成功，邀请人得点数（=10 次×10）
+  invite_referee_bonus: '100', // 被拉新用户得点数（=10 次×10）
+  invite_recharge_rebate_pct: '10', // ②充值返额：被邀请人(仅CoGPT)每次充值，邀请人额外得 充值点数的此百分比（赠送点数）
   chat_model: 'claude-sonnet-4-6', // 对话模式用的文本模型（创意沟通）
   // —— 风控/成本护栏 ——
   daily_gen_cap: '0', // 全站每日成功生图上限(0=不限)，防中转站成本失控
@@ -48,18 +60,19 @@ export const CONFIG_DEFAULTS: Record<string, string> = {
   download_mac_intel_url: '', // macOS 安装包（Intel x64）下载直链
   download_android_url: '', // 安卓 APK 下载直链
   download_mirror_note: '国内镜像高速下载', // 下载区文案
+  // 套餐配额为点数（方案B：原次数×10）。价格不变。
   name_trial: '体验版',
   price_trial_cents: '990', // ¥9.9 试用
-  quota_trial: '50',
+  quota_trial: '500', // 50 次×10
   name_basic: '基础版',
-  price_basic_cents: '2990', // ¥29.9（原 ¥49.9，降 ¥20）
-  quota_basic: '200',
+  price_basic_cents: '2990', // ¥29.9
+  quota_basic: '2000', // 200 次×10
   name_plus: '升级版',
   price_plus_cents: '5900', // ¥59
-  quota_plus: '500',
+  quota_plus: '5000', // 500 次×10
   name_ultra: '至尊版',
   price_ultra_cents: '12900', // ¥129
-  quota_ultra: '1500',
+  quota_ultra: '15000', // 1500 次×10
 
   // ===== 翰文（文书）产品：独立配置，不影响 CoGPT =====
   ws_relay_base_url: process.env.WS_RELAY_BASE_URL ?? 'https://api.qingyuntop.top',

@@ -1,5 +1,6 @@
 import { getConfig } from './config'
 import { prisma } from './db'
+import * as circuit from './circuit'
 
 // 参考图在转发到中转站前先压缩（长边≤1024、webp），把 2MB+ 降到 ~200KB，
 // 大幅缩短"后端→中转站"的上传耗时，避免参考图生图超过 Cloudflare ~100s 上限而 524。
@@ -549,7 +550,9 @@ export async function generate(x: GenInput, ext?: AbortSignal): Promise<GenResul
   // 按任务需求过滤中转站：带参考图改图→只用支持参考图的站；特殊画幅→只用支持该画幅的站。
   const hasRef = !!(x.initImages && x.initImages.length)
   const ratio = sizeToRatio(x.size)
+  const dmap = await circuit.disabledMap() // 熔断中的(模型×站)禁用窗口，请求开始读一次
   const capable = all.filter((r) => {
+    if (circuit.isDisabled(dmap, r.id, x.model)) return false // 已熔断临时下架(2h后惰性恢复)
     if (hasRef && !r.ref) return false // 带参考图/改图 → 只用支持参考图的站
     if (r.ratios.length && !r.ratios.includes(ratio)) return false // 特殊画幅 → 只用支持该画幅的站
     return true
@@ -589,6 +592,7 @@ export async function generate(x: GenInput, ext?: AbortSignal): Promise<GenResul
             : await openaiGen(relay, x, ac.signal)
       if (r.ok) {
         r.relayId = relay.id // 记录实际出图的站，落库供统计
+        await circuit.recordOutcome(relay.id, relay.name, x.model, true).catch(() => {}) // 成功→中断"连续失败"
         return r
       }
       last = r
@@ -602,6 +606,8 @@ export async function generate(x: GenInput, ext?: AbortSignal): Promise<GenResul
         error: r.error,
         aborted: r.aborted
       })
+      // 用户主动中止不计入故障；本站超时/报错计入熔断器（站×模型）。
+      if (!ext?.aborted) await circuit.recordOutcome(relay.id, relay.name, x.model, false).catch(() => {})
       if (ext?.aborted) return { ...r, aborted: true } // 用户主动中止：不再换站
       // 否则（本站超时/报错）→ 继续尝试下一个站
     } catch (e: any) {
@@ -609,6 +615,7 @@ export async function generate(x: GenInput, ext?: AbortSignal): Promise<GenResul
       const aborted = e?.name === 'AbortError'
       last = { ok: false, images: [], aborted, error: aborted ? '生图超时/已中止' : `生图异常：${e?.message ?? e}` }
       logRelayFail({ relayId: relay.id, format: relay.format, model: x.model, ms: Date.now() - tRelay, error: last.error, aborted })
+      if (!ext?.aborted) await circuit.recordOutcome(relay.id, relay.name, x.model, false).catch(() => {})
       if (ext?.aborted) return { ...last, aborted: true }
     } finally {
       clearTimeout(timer)

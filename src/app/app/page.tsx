@@ -196,7 +196,7 @@ export default function MobileApp() {
   if (!ready) return <div className={s.app}><div className={s.center}>正在启动…</div></div>
   if (!quota) return <Login onOk={(p, q, ms, meta) => { setPhone(p); setQuota(q); setModels(ms); setModelMeta(meta || {}) }} />
 
-  const credit = (quota.memberActive ? `${quota.memberCredits} 次` : `免费 ${quota.freeRemaining}/${quota.freeDaily}`) + (quota.bonusCredits ? ` · 赠${quota.bonusCredits}` : '')
+  const credit = (quota.memberActive ? `${quota.memberCredits} 点` : `免费 ${quota.freeRemaining}/${quota.freeDaily} 点`) + (quota.bonusCredits ? ` · 赠${quota.bonusCredits}` : '')
   return (
     <div className={s.app}>
       <div className={s.glow} /><div className={s.glow2} />
@@ -372,7 +372,7 @@ function Generate({ models, meta, msgs, setMsgs, onQuota }: { models: string[]; 
   const cancelRef = useRef<(() => void) | null>(null)
   useEffect(() => { if (model && !ratioOK(model, ratio)) setRatio('1:1') }, [model, ratio])
   // —— 两档质量模式：标准(gpt-image-2-light,额度1,无参考图) / 高质量(可切模型,额度2,image2可参考图) ——
-  const curMeta = meta[model] || { mode: 'quality', credits: 1, ref: true }
+  const curMeta = meta[model] || { mode: 'quality', credits: 10, ref: true }
   const isStd = curMeta.mode === 'standard'
   const refAllowed = !!curMeta.ref
   const stdModels = models.filter((m) => meta[m]?.mode === 'standard')
@@ -440,7 +440,7 @@ function Generate({ models, meta, msgs, setMsgs, onQuota }: { models: string[]; 
     setPrompt(''); setRefs([]); setPanel(null); setBusy(true)
     let sec = 0; const timer = setInterval(() => { sec++; setStatus(`正在生成…（已 ${sec}s，通常 30–60 秒）· 可点「中止」`) }, 1000)
     const reqId = uid()
-    const body = JSON.stringify({ prompt: p, model, size: sizeOf(ratio), initImages: curRefs.length ? curRefs : undefined, reqId })
+    const body = JSON.stringify({ prompt: p, model, size: sizeOf(ratio), initImages: curRefs.length ? curRefs : undefined, reqId, hdEdge: HD.find((h) => h.k === hd)?.edge || 0 })
     const ac = new AbortController()
     // 中止：既中断本地等待，也通知服务端中止中转站请求并释放并发锁（穿透 Cloudflare）
     cancelRef.current = () => { ac.abort(); void apiCall('/api/generate/cancel', { method: 'POST', body: JSON.stringify({ reqId }) }) }
@@ -523,7 +523,7 @@ function Generate({ models, meta, msgs, setMsgs, onQuota }: { models: string[]; 
                   <button className={`${s.segBtn} ${!isStd ? s.on : ''}`} onClick={() => pickTier('quality')}>高质量</button>
                 </div>
               </div>
-              <div className={s.setHint}>本次扣 {curMeta.credits} 额度{isStd ? '（通用 3 比例）' : '（可换模型 / 参考图 / 全比例）'}</div>
+              <div className={s.setHint}>本次扣 {curMeta.credits} 点{isStd ? '（通用 3 比例）' : '（可换模型 / 参考图 / 全比例；多张参考图、超清会额外计点）'}</div>
             </>)}
             {/* ③ 高质量档展开模型选择：高质量GPT / Nano Banana */}
             {!isStd && qModels.length > 1 && (

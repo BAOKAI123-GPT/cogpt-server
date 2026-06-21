@@ -246,8 +246,13 @@ function LogsTab() {
 // 多中转站 + 每模型选站（可视化）。relays / model_relays / suchuang_endpoints 都存进同一份 cfg。
 function RelayManager({ cfg, set }: { cfg: Record<string, string>; set: (k: string, v: string) => void }) {
   const [stats, setStats] = useState<Record<string, { total: number; ok: number; rate: number; avgMs: number }>>({})
+  const [bal, setBal] = useState<{ updatedAt: number; balances: any[] }>({ updatedAt: 0, balances: [] })
+  const loadBal = (force = false): void => {
+    api('/api/admin/relay-balances' + (force ? '?force=1' : '')).then((r) => r.ok && setBal({ updatedAt: r.data.updatedAt, balances: r.data.balances || [] }))
+  }
   useEffect(() => {
     api('/api/admin/relay-stats').then((r) => r.ok && setStats(r.data.stats || {}))
+    loadBal()
   }, [])
   const parseJson = (s: string | undefined, d: any): any => {
     try {
@@ -301,6 +306,54 @@ function RelayManager({ cfg, set }: { cfg: Record<string, string>; set: (k: stri
       <p style={{ fontSize: 12, opacity: 0.65, marginTop: -6 }}>
         中转站列表顺序 = 优先级（把便宜的放前面，前一个失败会自动切下一个）。下面给每个模型勾选可用的中转站。
       </p>
+      {/* 各中转站余额（1小时缓存） */}
+      <div style={{ border: '1px solid rgba(255,255,255,.14)', borderRadius: 8, padding: 10, marginBottom: 12, fontSize: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+          <b style={{ color: '#9db4ff' }}>💰 中转站余额</b>
+          <span style={{ opacity: 0.5 }}>{bal.updatedAt ? '更新于 ' + new Date(bal.updatedAt).toLocaleString() : '加载中…'}</span>
+          <button style={{ ...chip(false), marginLeft: 'auto' }} onClick={() => loadBal(true)}>刷新</button>
+        </div>
+        {bal.balances.length === 0 && <div style={{ opacity: 0.5 }}>暂无数据</div>}
+        {bal.balances.map((b) => (
+          <div key={b.id} style={{ display: 'flex', gap: 8, padding: '3px 0', borderTop: '1px solid rgba(255,255,255,.06)' }}>
+            <span style={{ flex: '0 0 90px' }}>{b.name || b.id}</span>
+            <span style={{ flex: 1 }}>
+              {b.available
+                ? b.remainingUsd != null
+                  ? `剩余 $${b.remainingUsd.toFixed(2)}${b.limitUsd != null ? ` / 总 $${b.limitUsd.toFixed(2)}` : ''}${b.usedUsd != null ? ` · 已用 $${b.usedUsd.toFixed(2)}` : ''}`
+                  : b.usedUsd != null
+                    ? `已用 $${b.usedUsd.toFixed(2)}（${b.note || '无总额度'}）`
+                    : '—'
+                : <span style={{ opacity: 0.55 }}>{b.note || '无余额接口'}</span>}
+            </span>
+          </div>
+        ))}
+      </div>
+      {/* 当前熔断中的(模型×中转站)：自动下架、到点自动恢复，无需人工 */}
+      {(() => {
+        const dis: Record<string, number> = parseJson(cfg.relay_disabled, {})
+        const now = Date.now()
+        const active = Object.entries(dis).filter(([, v]) => typeof v === 'number' && v > now)
+        return (
+          <div style={{ border: '1px solid ' + (active.length ? 'rgba(255,170,90,.5)' : 'rgba(255,255,255,.14)'), borderRadius: 8, padding: 10, marginBottom: 12, fontSize: 12 }}>
+            <b style={{ color: active.length ? '#ffb15e' : '#9db4ff' }}>⛔ 熔断中（自动下架 · 到点自动恢复）</b>
+            {active.length === 0 ? (
+              <div style={{ opacity: 0.5, marginTop: 4 }}>当前无熔断，所有模型/中转站正常。</div>
+            ) : (
+              active.map(([k, until]) => {
+                const [model, relayId] = k.split('|')
+                const mins = Math.max(0, Math.round((until - now) / 60000))
+                return (
+                  <div key={k} style={{ display: 'flex', gap: 8, padding: '3px 0', borderTop: '1px solid rgba(255,255,255,.06)' }}>
+                    <span style={{ flex: 1 }}>{model} @ {relayId}</span>
+                    <span style={{ opacity: 0.7 }}>约 {mins} 分钟后恢复（{new Date(until).toLocaleString()}）</span>
+                  </div>
+                )
+              })
+            )}
+          </div>
+        )
+      })()}
       {relays.map((r, i) => (
         <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <input style={{ ...input, flex: '0 0 84px' }} placeholder="名称" value={r.name || ''} onChange={(e) => updRelay(i, { name: e.target.value })} />

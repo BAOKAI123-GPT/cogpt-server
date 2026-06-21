@@ -1,5 +1,5 @@
 import { prisma } from './db'
-import { getTiers, getWsTiers } from './config'
+import { getTiers, getWsTiers, getConfig } from './config'
 
 const MONTH_MS = 30 * 24 * 3600 * 1000
 
@@ -48,6 +48,18 @@ export async function settlePaidOrder(outTradeNo: string, tradeNo?: string | nul
         memberCredits: { increment: t.quota }
       }
     })
+
+    // ②充值返额（仅 CoGPT，单层分销）：被邀请人每次充值，邀请人额外得 充值点数的 N% 作为赠送点数。
+    // 不可提现、单层、每次都返（成本约充值收入的<3%）。自邀已在 applyInvite 阶段防住。
+    if (u?.invitedBy) {
+      const pct = Number(await getConfig('invite_recharge_rebate_pct')) || 0
+      const rebate = Math.floor((t.quota * pct) / 100)
+      if (rebate > 0) {
+        await prisma.user
+          .update({ where: { id: u.invitedBy }, data: { bonusCredits: { increment: rebate } } })
+          .catch(() => {})
+      }
+    }
   }
   return true
 }

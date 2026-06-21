@@ -54,7 +54,7 @@ const isMobileUA = (): boolean => typeof navigator !== 'undefined' && /Android|i
 const uid = (): string => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'c' + Date.now() + Math.random().toString(36).slice(2))
 
 interface Quota { memberActive: boolean; memberTier: string; memberCredits: number; memberExpiresAt: string | null; bonusCredits: number; freeRemaining: number; freeDaily: number; inviteCode?: string; inviteCount?: number }
-interface Msg { role: 'user' | 'assistant'; text?: string; refs?: string[]; img?: string; error?: string }
+interface Msg { role: 'user' | 'assistant'; text?: string; refs?: string[]; img?: string; error?: string; note?: string }
 
 let token: string | null = null
 async function apiCall(path: string, opts: RequestInit = {}): Promise<{ ok: boolean; status: number; data: any }> {
@@ -467,7 +467,7 @@ function Generate({ models, meta, msgs, setMsgs, onQuota }: { models: string[]; 
       let out = res.data.images[0]
       const edge = HD.find((h) => h.k === hd)?.edge || 0
       if (edge) { setBusy(true); setStatus('正在生成高清大图…'); out = await upscale(out, edge); setBusy(false); setStatus('') }
-      setMsgs((prev) => [...prev, { role: 'assistant', img: out }])
+      setMsgs((prev) => [...prev, { role: 'assistant', img: out, note: res.data.fallback ? '⚡ 高质量模型当前繁忙，已用「极速」模型为你生成（风格可能略有不同）' : undefined }])
       if (res.data.quota) onQuota(res.data.quota)
     } else setMsgs((prev) => [...prev, { role: 'assistant', error: last }])
   }
@@ -486,6 +486,7 @@ function Generate({ models, meta, msgs, setMsgs, onQuota }: { models: string[]; 
         ) : (
           <div className={s.msgAsst} key={i}>
             {m.img ? (<>
+              {m.note && <p className={s.notice} style={{ color: '#ffd27a', marginBottom: 6 }}>{m.note}</p>}
               <img className={s.result} src={m.img} alt="生成结果" onClick={() => { if (refAllowed) setEditSrc(m.img!) }} {...longPress((x, y) => imgMenu(x, y, m.img!))} />
               <p className={s.notice} style={{ textAlign: 'center', marginTop: 4 }}>{refAllowed ? '点图可局部重绘/编辑 · 长按更多' : '长按可保存'}</p>
             </>) : m.text ? (

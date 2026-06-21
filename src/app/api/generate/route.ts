@@ -175,6 +175,44 @@ export async function POST(req: Request): Promise<Response> {
       .catch(() => {})
 
     if (!r.ok) {
+      // —— 失败兜底：所选模型在所有中转站都失败时，用最稳的兜底模型(默认 z-image-turbo，6s 双站)补出一张，
+      //    尽量不让用户空手而归。仅在：非用户中止、非参考图改图(兜底为纯文生图)、非安全/违规拒绝、
+      //    且仍有时间(elapsed<72s，留足时间给兜底，防超 Cloudflare ~100s) 时启用。按兜底模型实际计费。 ——
+      const fbModel = (await getConfig('fallback_model')) || ''
+      const safetyBlocked = /safety|rejected by the safety|content.?policy|内容|违规|敏感/i.test(r.error || '')
+      const canFallback =
+        !!fbModel && fbModel !== useModel && allowed.includes(fbModel) &&
+        !r.aborted && !hasRef && !safetyBlocked && Date.now() - t0 < 72_000
+      if (canFallback) {
+        let fbCredits = 10
+        try {
+          const mc = JSON.parse((await getConfig('model_credits')) || '{}')
+          if (typeof mc?.[fbModel] === 'number' && mc[fbModel] > 0) fbCredits = mc[fbModel]
+        } catch {
+          /* 默认 10 */
+        }
+        const q2 = await quotaStatus(u, fbCredits)
+        if (q2.canGenerate) {
+          const tf = Date.now()
+          const rf = await generate({ prompt: promptStr, size: typeof size === 'string' ? size : undefined, model: fbModel }, signal)
+          await prisma.genLog
+            .create({
+              data: {
+                userId: u.id, model: fbModel, ok: rf.ok, source: q2.source || 'free',
+                error: rf.ok ? null : ('兜底失败:' + (rf.error ?? '')).slice(0, 500),
+                ms: Date.now() - tf, relayId: rf.relayId ?? null, prompt: promptStr.slice(0, 500)
+              }
+            })
+            .catch(() => {})
+          if (rf.ok) {
+            await consume(u.id, fbCredits)
+            const freshF = await prisma.user.findUnique({ where: { id: u.id } })
+            const afterF = freshF ? await quotaStatus(freshF) : q2
+            // fallback 标记：客户端可提示"原模型繁忙，已用极速模型为你生成"
+            return { status: 200, body: { ok: true, images: rf.images, text: rf.text, quota: afterF, fallback: true, fallbackModel: fbModel } }
+          }
+        }
+      }
       // 失败不扣额度（也不缓存，允许客户端重试）。原始错误已落 GenLog + pm2，返回前端用友好中文。
       return { status: 502, body: { error: friendlyError(r.error) } }
     }

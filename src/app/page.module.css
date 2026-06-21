@@ -68,14 +68,14 @@ a.announce:hover { transform: translateY(-2px); box-shadow: 0 16px 50px rgba(139
 /* Hero */
 .hero { padding: 76px 0 40px; text-align: center; }
 .badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; background: var(--panel); border: 1px solid var(--edge); font-size: 13px; color: var(--muted); }
-.heroTitle { font-size: clamp(30px, 7vw, 72px); font-weight: 850; line-height: 1.1; letter-spacing: -1px; margin: 22px 0 0; overflow-wrap: break-word; }
+.heroTitle { font-size: clamp(30px, 7vw, 72px); font-weight: 850; line-height: 1.1; letter-spacing: -1px; margin: 22px 0 0; overflow-wrap: break-word; filter: drop-shadow(0 3px 28px rgba(0, 0, 0, 0.6)) drop-shadow(0 1px 3px rgba(0, 0, 0, 0.5)); }
 .grad {
   background: linear-gradient(110deg, #b8a4ff, var(--brand) 30%, var(--pink) 60%, var(--cyan));
   background-size: 200% auto; -webkit-background-clip: text; background-clip: text; color: transparent;
   animation: shimmer 6s linear infinite;
 }
 @keyframes shimmer { to { background-position: 200% center; } }
-.heroSub { font-size: clamp(16px, 2.2vw, 20px); color: var(--muted); margin: 20px auto 0; max-width: 640px; line-height: 1.7; }
+.heroSub { font-size: clamp(16px, 2.2vw, 20px); color: #d3cfe6; margin: 20px auto 0; max-width: 640px; line-height: 1.7; text-shadow: 0 1px 16px rgba(0, 0, 0, 0.7), 0 1px 2px rgba(0, 0, 0, 0.5); }
 .heroCta { display: flex; gap: 14px; justify-content: center; margin-top: 30px; flex-wrap: wrap; }
 .heroNote { margin-top: 16px; font-size: 13px; color: var(--muted); }
 
@@ -183,7 +183,11 @@ a.announce:hover { transform: translateY(-2px); box-shadow: 0 16px 50px rgba(139
 /* 首屏全屏流体光影（WebGL）：横向铺满整屏，定位文案浮于其上；跟随鼠标流动 */
 .shaderHero { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 100vw; height: 100%; z-index: -1; overflow: hidden; pointer-events: none; }
 .shaderCanvas { width: 100%; height: 100%; display: block; }
-.shaderOverlay { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 80% 72% at 50% 42%, rgba(10, 8, 18, 0.12), rgba(10, 8, 18, 0.55) 70%, rgba(10, 8, 18, 0.84)); }
+/* 文字区暗场：标题/副标题落在更暗的区域，与流光拉开层次、保证清晰可读；四周仍透出流光。 */
+.shaderOverlay { position: absolute; inset: 0; pointer-events: none; background:
+  radial-gradient(ellipse 62% 52% at 50% 44%, rgba(8, 6, 15, 0.66), rgba(8, 6, 15, 0.32) 60%, rgba(8, 6, 15, 0.0) 82%),
+  linear-gradient(180deg, rgba(8, 6, 15, 0.35), rgba(8, 6, 15, 0.0) 30%, rgba(8, 6, 15, 0.0) 70%, rgba(10, 8, 18, 0.7));
+}
 
 /* 页脚客服微信（紧凑·二维码保持比例·点击放大 lightbox） */
 .contact { margin-top: 18px; }

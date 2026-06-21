@@ -33,6 +33,9 @@ export const CONFIG_DEFAULTS: Record<string, string> = {
   model_mode: '{"gpt-image-2-light":"standard","gpt-image-2":"quality","gemini-2.5-flash-image":"quality"}',
   // —— 点数制（方案B）：1 旧额度 = 10 点。标准10 / 高质量GPT20 / Gemini30(=1.5×GPT，成本最高故最贵) ——
   model_credits: '{"gpt-image-2-light":10,"gpt-image-2":20,"gemini-2.5-flash-image":30}',
+  // 模型→前端友好名（Config 驱动：以后加新模型只改这里+model_relays 等即可，无需发客户端版本）
+  model_labels:
+    '{"gpt-image-2-light":"标准","gpt-image-2":"高质量GPT","gemini-2.5-flash-image":"Nano Banana","z-image-turbo":"极速(约6秒)","qwen-image-max":"通义·中文准"}',
   // 多参考图加价：每多 1 张参考图(>1)额外加点（多图上传慢、易超时、占上游更多）。
   ref_extra_points: '5',
   // 高清加价：按本地放大目标长边阈值加点（高清=本地放大，对我方零API成本，属产品/利润杠杆，可调 0 关闭）。

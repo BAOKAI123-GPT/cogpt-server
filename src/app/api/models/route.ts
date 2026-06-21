@@ -23,12 +23,19 @@ export async function GET(): Promise<Response> {
   } catch {
     credits = {}
   }
-  const meta: Record<string, { mode: string; credits: number; ref: boolean }> = {}
+  let labels: Record<string, string> = {}
+  try {
+    labels = JSON.parse((await getConfig('model_labels')) || '{}')
+  } catch {
+    labels = {}
+  }
+  const meta: Record<string, { mode: string; credits: number; ref: boolean; label: string }> = {}
   for (const m of models) {
     meta[m] = {
       mode: mode[m] === 'standard' ? 'standard' : 'quality',
       credits: Number(credits[m]) > 0 ? Number(credits[m]) : 10,
-      ref: await modelRefSupported(m)
+      ref: await modelRefSupported(m),
+      label: typeof labels[m] === 'string' && labels[m] ? labels[m] : m
     }
   }
   // 定价规则（点数制）：客户端据此显示预估扣点（多参考图/高清加价）。扣费仍以服务端为准。

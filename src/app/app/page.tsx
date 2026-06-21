@@ -15,7 +15,7 @@ const STRICT = ['1:1', '2:3', '3:2']
 const anyRatio = (m: string): boolean => /gemini/i.test(m || '') || /gpt-image-2(?!-?light)/i.test(m || '')
 const ratioOK = (m: string, k: string): boolean => anyRatio(m) || STRICT.includes(k)
 const sizeOf = (k: string): string => (RATIOS.find((r) => r.k === k) || RATIOS[0]).size
-type ModelMeta = Record<string, { mode: string; credits: number; ref: boolean }>
+type ModelMeta = Record<string, { mode: string; credits: number; ref: boolean; label?: string }>
 const MODEL_LABEL: Record<string, string> = { 'gpt-image-1-mini': '快速', 'gpt-image-2': '高质量GPT', 'gpt-image-2-all': '高质量GPT', 'gpt-image-2-light': '标准', 'gemini-2.5-flash-image': 'Nano Banana' }
 const mLabel = (m: string): string => MODEL_LABEL[m] || m
 // 生成图保存文件名：1.png … 100.png 循环。用模块级计数器（可靠递增，不受 localStorage 是否可用影响），
@@ -523,12 +523,12 @@ function Generate({ models, meta, msgs, setMsgs, onQuota }: { models: string[]; 
             {!isStd && qModels.length > 1 && (
               <div className={s.setRow}>
                 <span className={s.setLabel}>模型</span>
-                <div className={s.chips}>{qModels.map((m) => <button key={m} className={`${s.chip} ${m === model ? s.on : ''}`} onClick={() => setModel(m)}>{mLabel(m)}</button>)}</div>
+                <div className={s.chips}>{qModels.map((m) => <button key={m} className={`${s.chip} ${m === model ? s.on : ''}`} onClick={() => setModel(m)}>{meta[m]?.label || mLabel(m)}</button>)}</div>
               </div>
             )}
             {/* 比例 */}
             <div className={s.setBlock}>
-              <div className={s.setLabel}>比例 {!anyRatio(model) && <span style={{ color: '#ffd27a', fontWeight: 400 }}>（{mLabel(model)} 仅 3 比例，9:16 等请切高质量）</span>}</div>
+              <div className={s.setLabel}>比例 {!anyRatio(model) && <span style={{ color: '#ffd27a', fontWeight: 400 }}>（{meta[model]?.label || mLabel(model)} 仅 3 比例，9:16 等请切高质量）</span>}</div>
               <div className={s.chips}>{RATIOS.map((r) => { const ok = ratioOK(model, r.k); return <button key={r.k} disabled={!ok} className={`${s.chip} ${r.k === ratio ? s.on : ''}`} onClick={() => { if (ok) setRatio(r.k) }}>{r.k}</button> })}</div>
             </div>
             {/* 高清 */}

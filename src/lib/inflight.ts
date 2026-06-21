@@ -17,7 +17,7 @@ interface Flight {
 const inflight = new Map<string, Flight>() // reqId -> 在途生成
 const controllers = new Map<string, AbortController>() // reqId -> 中止控制器（供"中止生图"用）
 const done = new Map<string, { out: GenOut; at: number }>() // reqId -> 已完成(仅缓存成功)
-const userBusy = new Set<string>() // 正在生图的用户(防同一用户并发刷)
+const userActive = new Map<string, number>() // userId -> 在途生成数（每用户并发上限，允许同账号同时多张）
 const RESULT_TTL = 10 * 60 * 1000
 
 function gc(): void {
@@ -32,14 +32,17 @@ export function getCached(reqId: string): GenOut | undefined {
 export function getInflight(reqId: string): Promise<GenOut> | undefined {
   return inflight.get(reqId)?.promise
 }
-export function userIsBusy(userId: string): boolean {
-  return userBusy.has(userId)
+/** 该用户当前在途生成数（用于"每用户并发上限"判断）。 */
+export function userActiveCount(userId: string): number {
+  return userActive.get(userId) || 0
 }
 
-/** 受幂等保护地执行一次生成；成功(200)结果会被缓存供重试复用。fn 收到中止信号，可在用户点"中止"时停止。 */
+/** 受幂等保护地执行一次生成；成功(200)结果会被缓存供重试复用。fn 收到中止信号，可在用户点"中止"时停止。
+ *  cap：该用户允许的并发在途数（允许同账号同时多张；不同账号互不影响）。 */
 export async function runOnce(
   reqId: string,
   userId: string,
+  cap: number,
   fn: (signal: AbortSignal) => Promise<GenOut>
 ): Promise<GenOut> {
   const cached = getCached(reqId)
@@ -47,10 +50,10 @@ export async function runOnce(
   const existing = inflight.get(reqId)
   if (existing) return existing.promise
 
-  // 原子并发锁：同一用户已有在途请求（不同 reqId）直接拒绝，防并发刷额度/超花
+  // 每用户并发上限：超过才拒绝（默认 3）。同一账号可同时生成多张、中止后立刻能开下一张；不同账号天然互不影响。
   // （放在 cached/inflight 判断之后，确保同 reqId 重试仍能复用结果而不被拦）
-  if (userBusy.has(userId)) {
-    return { status: 429, body: { error: '上一条还在处理中，请稍候' } }
+  if ((userActive.get(userId) || 0) >= Math.max(1, cap)) {
+    return { status: 429, body: { error: '您同时进行的生成已达上限，请等其中一张完成再试' } }
   }
 
   const ac = new AbortController()
@@ -61,13 +64,15 @@ export async function runOnce(
       return out
     } finally {
       inflight.delete(reqId)
-      userBusy.delete(userId)
+      const c = (userActive.get(userId) || 1) - 1
+      if (c <= 0) userActive.delete(userId)
+      else userActive.set(userId, c)
       controllers.delete(reqId)
     }
   })()
   inflight.set(reqId, { promise, userId })
   controllers.set(reqId, ac)
-  userBusy.add(userId)
+  userActive.set(userId, (userActive.get(userId) || 0) + 1)
   return promise
 }
 

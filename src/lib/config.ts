@@ -48,6 +48,7 @@ export const CONFIG_DEFAULTS: Record<string, string> = {
   chat_model: 'claude-sonnet-4-6', // 对话模式用的文本模型（创意沟通）
   // —— 风控/成本护栏 ——
   daily_gen_cap: '0', // 全站每日成功生图上限(0=不限)，防中转站成本失控
+  user_concurrency: '3', // 每个账号允许同时进行的生成数(允许同账号多张并发;不同账号互不影响)。防单用户无限并发刷量
   blocked_words: '习近平,法轮功,六四,台独,港独,裸体,色情,做爱,性交,自杀教程,炸弹制作,枪支制作', // 提示词违规词(逗号分隔)，命中即拦截
   sms_ip_hourly_cap: '20', // 单 IP 每小时最多发码数
   sms_daily_cap: '500', // 全站每日发码上限，防短信余额被刷光

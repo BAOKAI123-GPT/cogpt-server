@@ -5,7 +5,7 @@ import { checkPrompt } from '@/lib/moderation'
 import { checkScope, latestUserText } from '@/lib/wsScope'
 import { agentChat, estimateTokens, type RawMessage } from '@/lib/wsRelay'
 import { refillIfNeeded, wsQuotaStatus, consumeTokens } from '@/lib/wsQuota'
-import { getCached, getInflight, userIsBusy, runOnce, type GenOut } from '@/lib/inflight'
+import { getCached, getInflight, userActiveCount, runOnce, type GenOut } from '@/lib/inflight'
 import { prisma } from '@/lib/db'
 
 function startOfToday(): Date {
@@ -39,11 +39,11 @@ export async function POST(req: Request): Promise<Response> {
     const r = await flight
     return NextResponse.json(r.body, { status: r.status })
   }
-  if (userIsBusy(u.id)) {
+  if (userActiveCount(u.id) >= 1) {
     return NextResponse.json({ error: '上一条还在处理中，请稍候' }, { status: 429 })
   }
 
-  const out: GenOut = await runOnce(rid, u.id, async () => {
+  const out: GenOut = await runOnce(rid, u.id, 1, async () => {
     const userText = latestUserText(messages)
 
     // 文员范围审核 + 内容审核（命中不调用、不扣费、留痕）

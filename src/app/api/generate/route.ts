@@ -4,7 +4,7 @@ import { quotaStatus, consume } from '@/lib/quota'
 import { generate } from '@/lib/relay'
 import { getConfig } from '@/lib/config'
 import { checkPrompt } from '@/lib/moderation'
-import { getCached, getInflight, userIsBusy, runOnce, type GenOut } from '@/lib/inflight'
+import { getCached, getInflight, userActiveCount, runOnce, type GenOut } from '@/lib/inflight'
 import { prisma } from '@/lib/db'
 
 function startOfToday(): Date {
@@ -53,12 +53,14 @@ export async function POST(req: Request): Promise<Response> {
     const r = await flight
     return NextResponse.json(r.body, { status: r.status })
   }
-  // 同一用户同时只允许一张在生成（防突发刷量）
-  if (userIsBusy(u.id)) {
-    return NextResponse.json({ error: '您有一张图正在生成中，请稍候' }, { status: 429 })
+  // 每用户并发上限（默认 3，后台 user_concurrency 可调）：允许同一账号同时生成多张、中止后立刻能开下一张；
+  // 不同账号天然互不影响。仍保留全站每日上限(daily_gen_cap)防成本失控。
+  const cap = Number(await getConfig('user_concurrency')) || 3
+  if (userActiveCount(u.id) >= cap) {
+    return NextResponse.json({ error: '您同时进行的生成已达上限，请等其中一张完成再试' }, { status: 429 })
   }
 
-  const out: GenOut = await runOnce(rid, u.id, async (signal) => {
+  const out: GenOut = await runOnce(rid, u.id, cap, async (signal) => {
     // 模型必须在后台开放列表内
     let allowed: string[] = []
     try {

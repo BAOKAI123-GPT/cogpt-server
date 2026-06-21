@@ -142,14 +142,14 @@ a.announce:hover { transform: translateY(-2px); box-shadow: 0 16px 50px rgba(139
   .glow1 { animation: drift1 24s ease-in-out infinite alternate; }
   .glow2 { animation: drift2 29s ease-in-out infinite alternate; }
   .glow3 { animation: drift3 33s ease-in-out infinite alternate; }
-  /* 首屏分层上浮入场 */
-  .hero > * { animation: rise 0.85s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
-  .hero > *:nth-child(1) { animation-delay: 0.04s; }
-  .hero > *:nth-child(2) { animation-delay: 0.12s; }
-  .hero > *:nth-child(3) { animation-delay: 0.20s; }
-  .hero > *:nth-child(4) { animation-delay: 0.28s; }
-  .hero > *:nth-child(5) { animation-delay: 0.36s; }
-  .hero > *:nth-child(6) { animation-delay: 0.46s; }
+  /* 首屏分层上浮入场（tilefield 为 hero 第 1 个子元素，内容从 nth-child(2) 起） */
+  .hero > *:not(.tilefield) { animation: rise 0.85s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+  .hero > *:nth-child(2) { animation-delay: 0.05s; }
+  .hero > *:nth-child(3) { animation-delay: 0.13s; }
+  .hero > *:nth-child(4) { animation-delay: 0.21s; }
+  .hero > *:nth-child(5) { animation-delay: 0.29s; }
+  .hero > *:nth-child(6) { animation-delay: 0.37s; }
+  .hero > *:nth-child(7) { animation-delay: 0.47s; }
   /* 最受欢迎套餐：呼吸光晕 */
   .tierHot { animation: hotPulse 4.2s ease-in-out infinite; }
 }
@@ -179,6 +179,38 @@ a.announce:hover { transform: translateY(-2px); box-shadow: 0 16px 50px rgba(139
   background: radial-gradient(380px circle at var(--mx, 50%) var(--my, 50%), rgba(176, 108, 255, 0.18), transparent 60%);
 }
 .fcard:hover::before, .tier:hover::before { opacity: 1; }
+
+/* 首屏互动方块阵列 + 点击波浪扩散（logo/定位文案浮于其上；点击向四周扩散点亮） */
+.tilefield {
+  position: absolute; inset: 0; z-index: -1; pointer-events: auto; overflow: hidden;
+  display: grid; grid-template-columns: repeat(var(--cols, 24), 1fr);
+  -webkit-mask-image: radial-gradient(130% 105% at 50% 38%, #000 52%, transparent 100%);
+  mask-image: radial-gradient(130% 105% at 50% 38%, #000 52%, transparent 100%);
+}
+.tile { aspect-ratio: 1 / 1; border-right: 1px solid rgba(255, 255, 255, 0.022); border-bottom: 1px solid rgba(255, 255, 255, 0.022); position: relative; }
+.tile::after { content: ''; position: absolute; inset: 6px; border-radius: 6px; background: rgba(139, 92, 255, 0); }
+.tile.on::after { animation: tileWave 0.72s ease-out both; animation-delay: var(--d, 0ms); }
+@keyframes tileWave {
+  0% { transform: scale(0.5); background: rgba(139, 92, 255, 0); box-shadow: 0 0 0 rgba(52, 214, 232, 0); }
+  35% { transform: scale(1); background: rgba(139, 92, 255, 0.42); box-shadow: 0 0 20px rgba(139, 92, 255, 0.55); }
+  100% { transform: scale(0.5); background: rgba(139, 92, 255, 0); box-shadow: 0 0 0 rgba(52, 214, 232, 0); }
+}
+
+/* 页脚客服微信（紧凑·二维码保持比例·点击放大 lightbox） */
+.contact { margin-top: 18px; }
+.contact h4 { font-size: 13px; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+.qrThumb { display: block; padding: 0; border: none; background: #fff; border-radius: 12px; overflow: hidden; cursor: pointer; width: 112px; line-height: 0; position: relative; transition: transform 0.2s ease, box-shadow 0.25s ease; }
+.qrThumb:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(139, 92, 255, 0.35); }
+.qrThumb img { width: 112px; height: auto; display: block; }
+.qrZoom { position: absolute; left: 0; right: 0; bottom: 0; padding: 3px 0; font-size: 11px; color: #fff; text-align: center; background: rgba(0, 0, 0, 0.5); opacity: 0; transition: opacity 0.2s; }
+.qrThumb:hover .qrZoom { opacity: 1; }
+.contactWx { color: var(--muted); font-size: 13px; margin: 9px 0 0; }
+.contactWx b { color: var(--text); }
+.qrMask { position: fixed; inset: 0; z-index: 200; background: rgba(0, 0, 0, 0.72); backdrop-filter: blur(8px); display: grid; place-items: center; padding: 20px; animation: fadeIn 0.2s ease; }
+.qrBox { background: #fff; border-radius: 18px; padding: 14px; max-width: 340px; width: 100%; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5); }
+.qrBox img { width: 100%; height: auto; display: block; border-radius: 10px; }
+.qrClose { margin-top: 12px; width: 100%; padding: 10px; border: none; border-radius: 12px; background: linear-gradient(120deg, var(--brand), var(--brand2)); color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 @media (max-width: 820px) {
   .navLinks { display: none; }

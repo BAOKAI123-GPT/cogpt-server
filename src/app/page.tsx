@@ -5,6 +5,8 @@ import { getTiers, getConfig } from '@/lib/config'
 import { IcChat, IcBrush, IcImage, IcVector, IcZoom, IcShield, IcSparkles, IcGlobe, IcPhone, IcZap, IcCheck, IcDownload } from './icons'
 import { DownloadGuide } from './DownloadGuide'
 import { Motion } from './Motion'
+import { TileField } from './TileField'
+import { WechatContact } from './WechatContact'
 
 // 始终服务端实时渲染：读取后台可改的价格/下载链接，改完即时生效
 export const dynamic = 'force-dynamic'
@@ -88,6 +90,7 @@ export default async function Home() {
 
       {/* Hero */}
       <header className={`${s.wrap} ${s.hero}`}>
+        <TileField />
         <span className={s.badge}><IcSparkles size={14} /> 对话即创作的 AI 生图工作台</span>
         <h1 className={s.heroTitle}>
           想到即所见<br /><span className={s.grad}>用一句话，生成一张图</span>
@@ -203,6 +206,7 @@ export default async function Home() {
             <div>
               <div className={s.brand} style={{ marginBottom: 10 }}><Logo gradId="footLogo" /> Co-GPT</div>
               <p>对话即创作的 AI 生图工作台。</p>
+              <WechatContact />
             </div>
             <div>
               <h4>产品</h4>
@@ -221,18 +225,6 @@ export default async function Home() {
               <h4>法律</h4>
               <a href="/terms">用户协议</a>
               <a href="/privacy">隐私政策</a>
-            </div>
-            <div>
-              <h4>联系 / 加微信</h4>
-              <img
-                src="/wechat-qr.jpg"
-                alt="微信二维码"
-                width={120}
-                height={120}
-                style={{ width: 120, height: 120, borderRadius: 10, background: '#fff', padding: 6, display: 'block' }}
-              />
-              <p style={{ marginTop: 8 }}>微信号：<b style={{ color: '#fff' }}>b0207123k</b></p>
-              <p style={{ marginTop: 2, opacity: 0.7 }}>扫码或搜微信号加好友</p>
             </div>
           </div>
           <p className={s.copyright}>© 2026 Co-GPT · All rights reserved.</p>

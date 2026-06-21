@@ -37,6 +37,10 @@ export default async function Home() {
   const androidUrl = await getConfig('download_android_url')
   const version = await getConfig('app_version')
   const mirrorNote = await getConfig('download_mirror_note')
+  const announceOn = (await getConfig('announce_enabled')) === '1'
+  const announceImg = await getConfig('announce_image_url')
+  const announceLink = await getConfig('announce_link_url')
+  const announceAlt = (await getConfig('announce_alt')) || '活动公告'
   const shots = ['s1', 's2', 's3', 's4', 's5', 's6']
 
   return (
@@ -62,6 +66,21 @@ export default async function Home() {
           <a className={`${s.btn} ${s.btnPrimary} ${s.navCta}`} href="/app">立即在线使用</a>
         </div>
       </nav>
+
+      {/* 活动 / 公告横幅（全宽长图，后台可换海报/改跳转/开关） */}
+      {announceOn && announceImg && (
+        <section className={s.wrap} aria-label="活动公告">
+          {announceLink ? (
+            <a className={s.announce} href={announceLink} target="_blank" rel="noopener noreferrer">
+              <img src={announceImg} alt={announceAlt} />
+            </a>
+          ) : (
+            <div className={s.announce}>
+              <img src={announceImg} alt={announceAlt} />
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Hero */}
       <header className={`${s.wrap} ${s.hero}`}>

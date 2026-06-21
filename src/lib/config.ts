@@ -67,6 +67,11 @@ export const CONFIG_DEFAULTS: Record<string, string> = {
   download_mac_intel_url: '', // macOS 安装包（Intel x64）下载直链
   download_android_url: '', // 安卓 APK 下载直链
   download_mirror_note: '国内镜像高速下载', // 下载区文案
+  // —— 官网公告/活动横幅（后台可改：换海报图、改跳转、开关；用于发布比赛/活动公告）——
+  announce_enabled: '1', // 1=显示横幅，0=隐藏
+  announce_image_url: '/announce-default.svg', // 横幅海报图（可换成你自己的比赛海报直链；建议宽幅长图，如 1600x340）
+  announce_link_url: '', // 点击横幅跳转的链接（空=不可点击）。如比赛详情页/公告链接
+  announce_alt: '活动公告', // 图片替代文字
   // 套餐配额为点数（方案B：原次数×10）。价格不变。
   name_trial: '体验版',
   price_trial_cents: '990', // ¥9.9 试用

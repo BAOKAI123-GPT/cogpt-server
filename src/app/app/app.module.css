@@ -94,7 +94,10 @@ textarea.field { resize: none; min-height: 96px; line-height: 1.5; }
 
 /* —— 即梦式紧凑布局 —— */
 /* 对话/生图模式 segmented（置于参考图区域上方）。.seg 也复用为设置面板内的小段切换。 */
-.modeSeg { display: flex; gap: 4px; padding: 3px; margin-bottom: 8px; border-radius: 12px; background: rgba(0, 0, 0, 0.28); border: 1px solid var(--edge); }
+.modeSeg { display: flex; gap: 4px; padding: 3px; border-radius: 12px; background: rgba(0, 0, 0, 0.28); border: 1px solid var(--edge); flex: 0 0 auto; }
+/* 单行控件：模式 + 参考图 + 设置；手机宽度不够自动换行(两行)。 */
+.ctrlRow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+.ctrlRow .toolBtn { flex: 1 1 auto; min-width: 96px; }
 .seg { display: flex; gap: 4px; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, 0.28); border: 1px solid var(--edge); }
 .segBtn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 8px 10px; border-radius: 9px; background: none; border: none; color: var(--muted); font-size: 13px; font-weight: 600; white-space: nowrap; }
 .segBtn.on { background: linear-gradient(120deg, var(--brand), var(--brand2)); color: #fff; }

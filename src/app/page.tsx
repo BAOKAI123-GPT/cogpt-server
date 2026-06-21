@@ -199,6 +199,18 @@ export default async function Home() {
               <a href="/terms">用户协议</a>
               <a href="/privacy">隐私政策</a>
             </div>
+            <div>
+              <h4>联系 / 加微信</h4>
+              <img
+                src="/wechat-qr.jpg"
+                alt="微信二维码"
+                width={120}
+                height={120}
+                style={{ width: 120, height: 120, borderRadius: 10, background: '#fff', padding: 6, display: 'block' }}
+              />
+              <p style={{ marginTop: 8 }}>微信号：<b style={{ color: '#fff' }}>b0207123k</b></p>
+              <p style={{ marginTop: 2, opacity: 0.7 }}>扫码或搜微信号加好友</p>
+            </div>
           </div>
           <p className={s.copyright}>© 2026 Co-GPT · All rights reserved.</p>
         </div>

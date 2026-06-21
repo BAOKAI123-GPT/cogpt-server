@@ -501,13 +501,7 @@ function Generate({ models, meta, msgs, setMsgs, onQuota }: { models: string[]; 
         {busy && <div className={s.statusCard}><span className={s.spin} />{status || '正在生成…'}{canAbort && <button onClick={() => cancelRef.current?.()} style={{ marginLeft: 12, background: 'rgba(255,255,255,.12)', border: '1px solid var(--edge)', borderRadius: 8, color: 'var(--text)', padding: '4px 12px', fontSize: 13 }}>中止</button>}</div>}
       </div>
       <div className={s.inputZone}>
-        {/* ① 对话/生图模式 segmented：置于参考图区域上方，点击切换。 */}
-        <div className={s.modeSeg}>
-          <button className={`${s.segBtn} ${mode === 'gen' ? s.on : ''}`} onClick={() => setMode('gen')}><IconGen />生图</button>
-          <button className={`${s.segBtn} ${mode === 'chat' ? s.on : ''}`} onClick={() => { setMode('chat'); setPanel(null) }}><IconQuote />对话</button>
-        </div>
-
-        {/* 参考图区域（缩略图）—— 紧贴模式切换之下 */}
+        {/* 参考图区域（缩略图）—— 在控件行之上 */}
         {mode === 'gen' && refs.length > 0 && (<div className={s.thumbs}>{refs.map((src, i) => (<div key={i} className={s.thumb}><img src={src} alt="参考图" /><button className={s.thumbX} onClick={() => setRefs((p) => p.filter((_, j) => j !== i))}>×</button></div>))}</div>)}
         {mode === 'gen' && refs.length >= 3 && (<div className={s.secTitle} style={{ color: '#ffd27a' }}>参考图越多生成越慢、越容易超时，建议精简到 1–2 张</div>)}
 
@@ -548,13 +542,19 @@ function Generate({ models, meta, msgs, setMsgs, onQuota }: { models: string[]; 
         {/* 参考图上传方式选择面板 */}
         {mode === 'gen' && panel === 'ref' && (<div className={s.setSheet}><div className={s.secTitle}>上传参考图（让 AI 参考其风格/构图，最多 4 张）</div><div className={s.uploadRow}><button className={s.uploadBtn} onClick={() => camRef.current?.click()}><IconCamera />拍照</button><button className={s.uploadBtn} onClick={() => albRef.current?.click()}><IconAlbum />从相册选择</button></div><button className={`${s.btn} ${s.btnGhost}`} style={{ marginTop: 10 }} onClick={() => editUpRef.current?.click()}><IconBrush /> 上传图片做局部重绘/编辑</button></div>)}
 
-        {/* 生图模式工具栏：参考图入口 + 一个常驻「设置」按钮（汇总画质/比例/高清，点开上方面板）。 */}
-        {mode === 'gen' && (
-          <div className={s.toolbar}>
-            {refAllowed && <button className={`${s.toolBtn} ${panel === 'ref' ? s.on : ''}`} onClick={() => setPanel(panel === 'ref' ? null : 'ref')}><IconImg />参考图{refs.length ? `(${refs.length})` : ''}</button>}
-            <button className={`${s.toolBtn} ${panel === 'set' ? s.on : ''}`} onClick={() => setPanel(panel === 'set' ? null : 'set')}><IconHD />{isStd ? '标准' : '高质量'} · {ratio} · {hdLabel}</button>
+        {/* 单行控件：对话/生图 + 参考图 + 设置（即梦式，详细项收进「设置」弹层；手机自动换两行）。 */}
+        <div className={s.ctrlRow}>
+          <div className={s.modeSeg}>
+            <button className={`${s.segBtn} ${mode === 'gen' ? s.on : ''}`} onClick={() => setMode('gen')}><IconGen />生图</button>
+            <button className={`${s.segBtn} ${mode === 'chat' ? s.on : ''}`} onClick={() => { setMode('chat'); setPanel(null) }}><IconQuote />对话</button>
           </div>
-        )}
+          {mode === 'gen' && refAllowed && (
+            <button className={`${s.toolBtn} ${panel === 'ref' ? s.on : ''}`} onClick={() => setPanel(panel === 'ref' ? null : 'ref')}><IconImg />参考图{refs.length ? `(${refs.length})` : ''}</button>
+          )}
+          {mode === 'gen' && (
+            <button className={`${s.toolBtn} ${panel === 'set' ? s.on : ''}`} onClick={() => setPanel(panel === 'set' ? null : 'set')}><IconHD />{isStd ? '标准' : '高质量'} · {ratio} · {hdLabel}</button>
+          )}
+        </div>
         <div className={s.inputRow}>
           <textarea placeholder={mode === 'chat' ? '说说你想要的图，我帮你聊清楚（想好了回复「生成」即可出图）' : '描述你想要的画面…'} value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={1} />
           <button className={s.sendBtn} disabled={busy || (mode === 'gen' ? (!prompt.trim() && refs.length === 0) : !prompt.trim())} onClick={() => (mode === 'chat' ? chatSend() : gen())}><IconSend /></button>

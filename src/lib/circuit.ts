@@ -60,7 +60,10 @@ async function trip(relayId: string, relayName: string, model: string, reason: s
 export async function disabledMap(): Promise<Record<string, number>> {
   let map: Record<string, number> = {}
   try {
-    map = JSON.parse((await getConfig('relay_disabled')) || '{}')
+    const parsed = JSON.parse((await getConfig('relay_disabled')) || '{}')
+    // 防御：必须是普通对象，否则当空（避免 relay_disabled 被写成字符串/数组时整条生图链 500）
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    map = parsed
   } catch {
     return {}
   }

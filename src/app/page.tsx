@@ -5,7 +5,7 @@ import { getTiers, getConfig } from '@/lib/config'
 import { IcChat, IcBrush, IcImage, IcVector, IcZoom, IcShield, IcSparkles, IcGlobe, IcPhone, IcZap, IcCheck, IcDownload } from './icons'
 import { DownloadGuide } from './DownloadGuide'
 import { Motion } from './Motion'
-import { TileField } from './TileField'
+import { ShaderHero } from './ShaderHero'
 import { WechatContact } from './WechatContact'
 
 // 始终服务端实时渲染：读取后台可改的价格/下载链接，改完即时生效
@@ -73,24 +73,9 @@ export default async function Home() {
         </div>
       </nav>
 
-      {/* 活动 / 公告横幅（全宽长图，后台可换海报/改跳转/开关） */}
-      {announceOn && announceImg && (
-        <section className={s.wrap} aria-label="活动公告">
-          {announceLink ? (
-            <a className={s.announce} href={announceLink} target="_blank" rel="noopener noreferrer">
-              <img src={announceImg} alt={announceAlt} />
-            </a>
-          ) : (
-            <div className={s.announce}>
-              <img src={announceImg} alt={announceAlt} />
-            </div>
-          )}
-        </section>
-      )}
-
       {/* Hero */}
       <header className={`${s.wrap} ${s.hero}`}>
-        <TileField />
+        <ShaderHero />
         <span className={s.badge}><IcSparkles size={14} /> 对话即创作的 AI 生图工作台</span>
         <h1 className={s.heroTitle}>
           想到即所见<br /><span className={s.grad}>用一句话，生成一张图</span>
@@ -116,6 +101,21 @@ export default async function Home() {
           <div className={s.trustItem}><b><IcCheck size={15} /> 失败不扣次</b><span>只为成功的图买单</span></div>
         </div>
       </header>
+
+      {/* 活动 / 公告横幅（移到首屏下方；全宽长图，后台可换海报/改跳转/开关） */}
+      {announceOn && announceImg && (
+        <section className={s.wrap} aria-label="活动公告" data-reveal>
+          {announceLink ? (
+            <a className={s.announce} href={announceLink} target="_blank" rel="noopener noreferrer">
+              <img src={announceImg} alt={announceAlt} />
+            </a>
+          ) : (
+            <div className={s.announce}>
+              <img src={announceImg} alt={announceAlt} />
+            </div>
+          )}
+        </section>
+      )}
 
       {/* 作品画廊 */}
       <section id="gallery" className={`${s.wrap} ${s.section}`}>

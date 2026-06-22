@@ -527,10 +527,20 @@ function Generate({ models, meta, msgs, setMsgs, onQuota }: { models: string[]; 
                 <div className={s.chips}>{qModels.map((m) => <button key={m} className={`${s.chip} ${m === model ? s.on : ''}`} onClick={() => setModel(m)}>{meta[m]?.label || mLabel(m)}</button>)}</div>
               </div>
             )}
-            {/* 比例 */}
+            {/* 比例：按 方形 / 竖版 / 横版 分组并标注方向，直观可选 */}
             <div className={s.setBlock}>
-              <div className={s.setLabel}>比例 {!anyRatio(model) && <span style={{ color: '#ffd27a', fontWeight: 400 }}>（{meta[model]?.label || mLabel(model)} 仅 3 比例，9:16 等请切高质量）</span>}</div>
-              <div className={s.chips}>{RATIOS.map((r) => { const ok = ratioOK(model, r.k); return <button key={r.k} disabled={!ok} className={`${s.chip} ${r.k === ratio ? s.on : ''}`} onClick={() => { if (ok) setRatio(r.k) }}>{r.k}</button> })}</div>
+              <div className={s.setLabel}>比例 {!anyRatio(model) && <span style={{ color: '#ffd27a', fontWeight: 400 }}>（{meta[model]?.label || mLabel(model)} 仅 3 种通用比例；要 9:16 竖屏 / 16:9 宽屏请切「高质量GPT」）</span>}</div>
+              {(['方形', '竖版', '横版'] as const).map((g) => {
+                const items = RATIOS.filter((r) => r.g === g)
+                return (
+                  <div key={g} className={s.ratioRow}>
+                    <span className={s.ratioTag} data-g={g}>{g}</span>
+                    <div className={s.chips}>
+                      {items.map((r) => { const ok = ratioOK(model, r.k); return <button key={r.k} disabled={!ok} className={`${s.chip} ${r.k === ratio ? s.on : ''}`} onClick={() => { if (ok) setRatio(r.k) }}>{r.k}</button> })}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
             {/* 高清 */}
             <div className={s.setBlock}>

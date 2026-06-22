@@ -29,12 +29,20 @@ export async function GET(): Promise<Response> {
   } catch {
     labels = {}
   }
+  let refModels: string[] = []
+  try {
+    const v = JSON.parse((await getConfig('ref_models')) || '[]')
+    if (Array.isArray(v)) refModels = v.map((x) => String(x))
+  } catch {
+    refModels = []
+  }
   const meta: Record<string, { mode: string; credits: number; ref: boolean; label: string }> = {}
   for (const m of models) {
     meta[m] = {
       mode: mode[m] === 'standard' ? 'standard' : 'quality',
       credits: Number(credits[m]) > 0 ? Number(credits[m]) : 10,
-      ref: await modelRefSupported(m),
+      // 同时满足：在参考图白名单内 且 有支持参考图的中转站，前端才显示参考图入口
+      ref: refModels.includes(m) && (await modelRefSupported(m)),
       label: typeof labels[m] === 'string' && labels[m] ? labels[m] : m
     }
   }

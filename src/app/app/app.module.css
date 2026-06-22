@@ -113,6 +113,14 @@ textarea.field { resize: none; min-height: 96px; line-height: 1.5; }
 .setLabel { font-size: 12px; color: var(--muted); font-weight: 600; flex-shrink: 0; min-width: 40px; margin-bottom: 6px; }
 .setRow .setLabel { margin-bottom: 0; }
 .setHint { font-size: 11px; color: var(--muted); opacity: 0.8; margin: -2px 0 10px; }
+/* 比例分组：方形/竖版/横版 一行一组，左侧彩色方向标签 */
+.ratioRow { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+.ratioRow:last-child { margin-bottom: 0; }
+.ratioTag { flex: 0 0 34px; font-size: 12px; font-weight: 700; }
+.ratioTag[data-g='方形'] { color: #b9a6ff; }
+.ratioTag[data-g='竖版'] { color: #7ee0f0; }
+.ratioTag[data-g='横版'] { color: #ffb15e; }
+.ratioRow .chips { flex: 1; }
 .inputRow { display: flex; gap: 8px; align-items: flex-end; }
 .inputRow textarea { flex: 1; padding: 11px 12px; border-radius: 12px; border: 1px solid var(--edge); background: rgba(0, 0, 0, 0.3); color: var(--text); font-size: 15px; outline: none; resize: none; min-height: 44px; max-height: 120px; line-height: 1.4; }
 .inputRow textarea:focus { border-color: var(--brand); }

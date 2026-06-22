@@ -74,6 +74,20 @@ export async function POST(req: Request): Promise<Response> {
     let promptStr = String(prompt || '').trim()
     const hasRef = Array.isArray(initImages) && initImages.length > 0
 
+    // 参考图白名单：只有支持改图的模型(gpt-image-2)才接受参考图；其它模型带参考图直接友好拦截，避免走 edits 报错。
+    if (hasRef) {
+      let refModels: string[] = []
+      try {
+        const v = JSON.parse((await getConfig('ref_models')) || '[]')
+        if (Array.isArray(v)) refModels = v.map((x) => String(x))
+      } catch {
+        refModels = []
+      }
+      if (!refModels.includes(useModel)) {
+        return { status: 400, body: { error: '该模型不支持上传参考图，请切换到「高质量GPT」再用参考图生成' } }
+      }
+    }
+
     // gpt-image 即使有参考图也必须带文字描述，否则中转站报 "prompt is required"。
     // 用了参考图但没打字 → 自动补一句默认描述，让"图生图/参考图直接生成"也能成功；
     // 既没文字也没参考图 → 确实没东西可生成，提示用户。
